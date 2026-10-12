@@ -41,7 +41,7 @@ function Confirm({ title, body, yes, danger, onYes, onClose }) {
     </Sheet>
   );
 }
-const backArrow = () => (LANG === 'ar' ? '→' : '←');
+const backArrow = () => '←';
 function TopBar({ onBack, left, title, right, dense }) {
   return (
     <div className={'topbar' + (dense ? ' dense' : '')}>
@@ -71,24 +71,11 @@ function Toast({ msg, ok, onClose }) {
   useEffect(() => { if (!ok) return undefined; const id = setTimeout(onClose, 3500); return () => clearTimeout(id); }, [msg, ok]);
   return <div className={'toast' + (ok ? ' ok' : '')} role="status"><span className="grow">{msg}</span><button onClick={onClose}>{t('dismiss')}</button></div>;
 }
-function LangButton({ settings, setSettings }) {
-  return <button className="pillbtn langbtn" onClick={() => setSettings({ ...settings, lang: settings.lang === 'ar' ? 'en' : 'ar' })} aria-label={t('langSwitchLabel')} lang={LANG === 'ar' ? 'en' : 'ar'}>{t('langSwitch')}</button>;
-}
 
-/* ---------- bilingual content ---------- */
-const QLangCtx = React.createContext('auto');
-function Txt({ v, as = 'span', className, both }) {
-  const qLang = React.useContext(QLangCtx);
+/* ---------- content text (clues, names); dir="auto" keeps typed text in any script laid out right ---------- */
+function Txt({ v, as = 'span', className }) {
   const Tag = as;
-  const main = pick(v, LANG);
-  const other = LANG === 'ar' ? 'en' : 'ar';
-  const showOther = (both || qLang === 'both') && v && typeof v === 'object' && v[other] && v[other].trim() && v[other].trim() !== main;
-  return (
-    <Tag className={className}>
-      <span dir="auto" lang={looksArabic(main) ? 'ar' : 'en'}>{main}</span>
-      {showOther && <span className="alt" dir="auto" lang={other}>{v[other].trim()}</span>}
-    </Tag>
-  );
+  return <Tag className={className}><span dir="auto">{pick(v)}</span></Tag>;
 }
 const Name = ({ team }) => <bdi dir="auto">{teamName(team)}</bdi>;
 const fmtNum = (n) => (n < 0 ? '−' : '') + Math.abs(n);
@@ -171,20 +158,20 @@ function LogoMark({ size = 64 }) {
   );
 }
 function Logo() {
-  return <h1 className="logo"><span className="en" lang="en">{APP_NAME.en}</span>{APP_NAME.ar && <span className="ar" lang="ar">{APP_NAME.ar}</span>}</h1>;
+  return <h1 className="logo"><span className="en">{APP_NAME}</span></h1>;
 }
 
 /* ============================================================
    HOME
    ============================================================ */
-function Home({ game, past, settings, setSettings, onNew, onContinue, onHow, onSettings, bank }) {
+function Home({ game, past, settings, setSettings, onNew, onContinue, onHow, onSettings, onClues, bank }) {
   const p = usePwa();
   const live = game && game.phase !== 'done' ? game : null;
   const where = live ? (live.phase === 'final' ? t('resumeFinal') : t('resumeRound', { n: live.round, left: openCells(live).length })) : '';
   return (
     <div className="app">
       <div className="topbar">
-        <LangButton settings={settings} setSettings={setSettings} />
+        <span className="iconspace" />
         <div className="title" />
         <button className="iconbtn" onClick={onSettings} aria-label={t('settings')}>⚙️</button>
       </div>
@@ -206,6 +193,7 @@ function Home({ game, past, settings, setSettings, onNew, onContinue, onHow, onS
           </button>
         )}
         <button className="btn btn-gold" onClick={onNew}>{t('newGame')}</button>
+        {onClues && <button className="btn" onClick={onClues}>✏️ {t('myClues')}</button>}
         <div className="row">
           <button className="btn grow" onClick={onHow}>{t('howToPlay')}</button>
           <button className="btn grow" onClick={onSettings}>{t('settings')}</button>
@@ -235,7 +223,7 @@ function Home({ game, past, settings, setSettings, onNew, onContinue, onHow, onS
    HOW TO PLAY
    ============================================================ */
 function HowTo({ onClose }) {
-  const lines = LANG === 'ar' ? S.howBody[1] : S.howBody[0];
+  const lines = S.howBody;
   return (
     <Sheet onClose={onClose}>
       <div className="stack">

@@ -1,7 +1,7 @@
-/* Jeopardy-Board c09764e99b — built from src/ by build.js. Edit src/, not this file. */
+/* Jeopardy-Board 0fd6fb3bbe — built from src/ by build.js. Edit src/, not this file. */
 "use strict";
 (function(){
-const APP_VERSION = "c09764e99b";
+const APP_VERSION = "0fd6fb3bbe";
 const SOUND_FILES = {};
 const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4);
 const shuffle = arr => {
@@ -60,7 +60,8 @@ const K = {
   current: 'jb_current_v1',
   past: 'jb_past_v1',
   history: 'jb_history_v1',
-  issues: 'jb_issues_v1'
+  issues: 'jb_issues_v1',
+  packs: 'jb_packs_v1'
 };
 const STORE_KEYS = Object.values(K);
 const store = (() => {
@@ -280,8 +281,10 @@ const fileStore = (() => {
   };
 })();
 const isLocalFile = src => typeof src === 'string' && src.startsWith('idb:');
-async function cleanFiles(soundFiles) {
-  const used = new Set(Object.values(soundFiles || {}).filter(isLocalFile).map(s => s.slice(4)));
+async function cleanFiles(soundFiles, packs) {
+  const snd = soundFiles || ((store.get(K.settings, {}) || {}).sound || {}).files || {};
+  const used = new Set(Object.values(snd).filter(isLocalFile).map(s => s.slice(4)));
+  packFileIds(packs || store.get(K.packs, [])).forEach(id => used.add(id));
   const keys = await fileStore.keys();
   await Promise.all((keys || []).filter(k => !used.has(k)).map(k => fileStore.del(k)));
 }
@@ -331,7 +334,8 @@ function makeBackup(state) {
       current: state.game || null,
       past: state.past || [],
       history: state.history || null,
-      issues: state.issues || []
+      issues: state.issues || [],
+      packs: state.packs || []
     }
   };
 }
@@ -362,12 +366,17 @@ function validateBackup(obj) {
     ok: false,
     error: 'bkDamaged'
   };
+  if (d.packs != null && (!Array.isArray(d.packs) || d.packs.some(p => !p || typeof p.id !== 'string' || !Array.isArray(p.clues) || !Array.isArray(p.categories)))) return {
+    ok: false,
+    error: 'bkDamaged'
+  };
   return {
     ok: true,
     data: d,
     summary: {
       past: d.past.length,
       current: !!d.current,
+      packs: (d.packs || []).length,
       exportedAt: obj.exportedAt
     }
   };
@@ -446,347 +455,433 @@ function usePwa() {
   return pwa;
 }
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
-const APP_NAME = {
-  en: 'Jeopardy-Board',
-  ar: null
-};
+const APP_NAME = 'Jeopardy-Board';
 const S = {
-  appName: ['Jeopardy-Board', 'Jeopardy-Board'],
-  tagline: ['Pick a clue, buzz in first, and bet it all in the final round.', 'اختار تلميح، اسبق الكل بالجواب، وراهن بكل شي في الجولة الأخيرة.'],
-  gameNight: ['Game night', 'ليلة ألعاب'],
-  newGame: ['New game', 'لعبة جديدة'],
-  continueGame: ['Continue game', 'كمّل اللعبة'],
-  resumeRound: ['round {n} · {left} clues left', 'الجولة {n} · باقي {left} تلميح'],
-  resumeFinal: ['final wager', 'الرهان الأخير'],
-  howToPlay: ['How to play', 'طريقة اللعب'],
-  settings: ['Settings', 'الإعدادات'],
-  back: ['Back', 'رجوع'],
-  close: ['Close', 'إغلاق'],
-  cancel: ['Cancel', 'إلغاء'],
-  confirm: ['Confirm', 'تأكيد'],
-  done: ['Done', 'تم'],
-  dismiss: ['OK', 'تمام'],
-  menu: ['Menu', 'القائمة'],
-  home: ['Home', 'الرئيسية'],
-  reload: ['Reload', 'إعادة التحميل'],
-  install: ['Install on this device', 'ثبّتها على جهازك'],
-  updateReady: ['A new version is ready.', 'فيه نسخة جديدة جاهزة.'],
-  langSwitch: ['العربية', 'English'],
-  langSwitchLabel: ['Switch to Arabic', 'التبديل إلى الإنجليزية'],
-  pastGames: ['Recent games', 'آخر الألعاب'],
-  won: ['won', 'فاز'],
-  draw: ['Draw', 'تعادل'],
-  bankNote: ['{q} clues in {c} categories.', '{q} تلميح في {c} فئة.'],
-  crashed: ['Something went wrong', 'صار خطأ'],
-  crashedSub: ['Your game is saved. Reload to carry on.', 'لعبتك محفوظة. أعد التحميل وكمّل.'],
-  seconds: ['{n}s', '{n} ث'],
-  setupTitle: ['New game', 'لعبة جديدة'],
-  teams: ['Teams', 'الفرق'],
-  teamN: ['Team {n}', 'الفريق {n}'],
-  defaultTeam1: ['Falcons', 'الصقور'],
-  defaultTeam2: ['Leopards', 'النمور'],
-  addTeam: ['Add a team (up to 4)', 'أضف فريق (حتى ٤)'],
-  removeTeam: ['Remove team {n}', 'احذف الفريق {n}'],
-  changeEmoji: ['Change emoji', 'غيّر الرمز'],
-  colour: ['Colour', 'اللون'],
-  categories: ['Categories', 'الفئات'],
-  catsOn: ['{n} of {of} categories on', '{n} من {of} فئة مفعّلة'],
-  catsPerGame: ['{n} per game', '{n} في كل لعبة'],
-  chooseCats: ['Choose categories', 'اختر الفئات'],
-  chooseCatsSub: ['Switched-on categories can come up. A game uses {n}.', 'الفئات المفعّلة ممكن تطلع. اللعبة تستخدم {n}.'],
-  catsRandom: ['Each board gets 6 categories at random from the ones switched on, mixing topics and avoiding recent ones.', 'كل لوحة تاخذ ٦ فئات عشوائية من المفعّلة، متنوعة وبعيدة عن اللي لعبتوها قريب.'],
-  cluesN: ['{n} clues', '{n} تلميح'],
-  allOn: ['All on', 'الكل'],
-  allOff: ['All off', 'ولا شي'],
-  gameRules: ['Game rules', 'قوانين اللعبة'],
-  rulesSummary: ['{r} round(s) · {f} · {v}', '{r} جولة · {f} · {v}'],
-  withFinal: ['final wager', 'رهان أخير'],
-  noFinal: ['no final', 'بدون رهان أخير'],
-  rounds: ['Rounds', 'الجولات'],
-  oneRound: ['1 round', 'جولة وحدة'],
-  twoRounds: ['2 rounds', 'جولتين'],
-  values: ['Points per row (round 1)', 'النقاط لكل صف (الجولة ١)'],
-  valuesSub: ['Round 2 doubles them: {r2}.', 'الجولة ٢ تضاعفها: {r2}.'],
-  rowN: ['Row {n} points', 'نقاط الصف {n}'],
-  finalRound: ['Final wager round', 'جولة الرهان الأخير'],
-  finalRoundSub: ['One last clue. Every team secretly bets on it.', 'تلميح أخير، وكل فريق يراهن عليه بالسر.'],
-  finalTime: ['Time to write the final response', 'وقت كتابة الجواب الأخير'],
-  questionForm: ['Responses must be a question', 'الجواب لازم يكون بصيغة سؤال'],
-  questionFormSub: ['Teams answer “What is…?” / “Who is…?”. You judge.', 'الفرق تجاوب «ما هو…؟» / «من هو…؟». أنت الحكم.'],
-  modifiers: ['Optional modifiers', 'إضافات اختيارية'],
-  modifiersOff: ['All off', 'كلها مطفأة'],
-  noMinus: ['No minus points', 'بدون خصم نقاط'],
-  noMinusSub: ['A wrong answer on a normal clue costs nothing. (Risk It and the final still count.)', 'الجواب الغلط في التلميح العادي ما يخصم شي. (خاطِر والرهان الأخير ما يتغيرون.)'],
-  answerClock: ['Answer clock', 'ساعة الجواب'],
-  answerClockSub: ['A countdown starts when a team buzzes in.', 'عدّاد يبدأ لما فريق يضغط.'],
-  answerTime: ['Time to answer', 'وقت الجواب'],
-  strictRepeats: ['Strict no-repeats', 'منع التكرار الصارم'],
-  strictRepeatsSub: ['Never reuse a clue seen in the last 50 games on this device, until a category runs out.', 'لا تعيد أي تلميح ظهر في آخر ٥٠ لعبة على هذا الجهاز، إلا إذا خلصت الفئة.'],
-  needNames: ['Every team needs a name.', 'كل فريق يحتاج اسم.'],
-  needAscending: ['Points must go up from row 1 to row 5.', 'النقاط لازم تزيد من الصف ١ إلى الصف ٥.'],
-  needCats: ['Switch on more categories: {have} can fill a board, the game needs {need}.', 'فعّل فئات أكثر: {have} فئة تكفي، واللعبة تحتاج {need}.'],
-  startGame: ['Start the game', 'ابدأ اللعبة'],
-  roundN: ['Round {n}', 'الجولة {n}'],
-  roundLeft: ['Round {n} · {left} left', 'الجولة {n} · باقي {left}'],
-  picksNext: ['{team} picks a clue', '{team} يختار تلميح'],
-  picksShort: ['Picks', 'يختار'],
-  boardHint: ['Tap the tile the picking team calls out.', 'اضغط الخانة اللي يختارها الفريق.'],
-  reportShort: ['{n} tiles are empty: not enough clues left in those categories.', '{n} خانة فاضية: ما بقى تلميحات كافية في فئاتها.'],
-  tileEmpty: ['no clue left', 'ما بقى تلميح'],
-  tileInvalid: ['removed as wrong', 'انحذف لأنه غلط'],
-  buzzNow: ['Read the clue. Who buzzed first?', 'اقرأ التلميح. مين ضغط أول؟'],
-  othersBuzz: ['The other teams can buzz now.', 'الفرق الثانية تقدر تضغط الحين.'],
-  whoBuzzed: ['Who buzzed first?', 'مين ضغط أول؟'],
-  nobody: ['Nobody — show the response', 'ولا أحد — اعرض الجواب'],
-  nobodyElse: ['Nobody else — show the response', 'ولا أحد ثاني — اعرض الجواب'],
-  answering: ['{team} is answering', '{team} يجاوب'],
-  right: ['Right', 'صح'],
-  wrong: ['Wrong', 'غلط'],
-  wrongTeamTapped: ['Wrong team? Undo the buzz', 'اخترت فريق غلط؟ تراجع'],
-  response: ['Response', 'الجواب'],
-  alsoAccept: ['Also accept:', 'يُقبل أيضاً:'],
-  asOf: ['True as of {d}', 'صحيح حتى {d}'],
-  needsCheck: ['⏳ Time-sensitive (as of {d}): check before trusting it', '⏳ معلومة قابلة للتغير (حتى {d}): تأكد منها'],
-  showResponse: ['Show the response (host)', 'اعرض الجواب (للمقدم)'],
-  hideResponse: ['Hide the response', 'اخفِ الجواب'],
-  qFormReminder: ['Answer in the form of a question', 'الجواب بصيغة سؤال'],
-  qFormJudge: ['Only accept it if it was phrased as a question.', 'اقبله فقط إذا كان بصيغة سؤال.'],
-  flashRight: ['Right!', 'صح!'],
-  flashWrong: ['Wrong', 'غلط'],
-  flashNone: ['Nobody', 'ولا أحد'],
-  flashInvalid: ['Clue removed', 'انحذف التلميح'],
-  nobodyGotIt: ['Nobody got it', 'محد جاوبها'],
-  skipped: ['Skipped', 'تخطّي'],
-  pointsTo: ['+{n} to {team}', '+{n} لـ {team}'],
-  lostPoints: ['−{n} for {team}', '−{n} على {team}'],
-  backToBoard: ['Back to the board', 'رجوع للوحة'],
-  endOfRound: ['End of the round', 'نهاية الجولة'],
-  timeUp: ['Time!', 'انتهى الوقت!'],
-  riskIt: ['Risk It!', 'خاطِر!'],
-  riskItSub: ['A hidden wager square', 'خانة رهان مخفية'],
-  riskWagering: ['{team} found a Risk It square', '{team} لقى خانة «خاطِر»'],
-  riskWagerQ: ['How much does {team} risk?', 'كم يخاطر {team}؟'],
-  riskWagerRule: ['Score {score}. Bet anything from 0 up to {max} (your score, or the round’s top value if that’s more).', 'النقاط {score}. راهن من ٠ إلى {max} (نقاطك، أو أعلى قيمة في الجولة إذا كانت أكثر).'],
-  riskHidden: ['Only this team plays it. The clue appears once the wager is locked.', 'هذا الفريق بس يلعبها. التلميح يظهر بعد تثبيت الرهان.'],
-  wager: ['Wager', 'الرهان'],
-  allIn: ['All in ({n})', 'الكل ({n})'],
-  wagerRange: ['Enter a whole number from 0 to {max}.', 'اكتب رقم من ٠ إلى {max}.'],
-  lockWager: ['Lock the wager', 'ثبّت الرهان'],
-  bestRisk: ['Biggest Risk It won', 'أكبر «خاطِر» ناجحة'],
-  roundOver: ['End of round {n}', 'نهاية الجولة {n}'],
-  cutShort: ['ended early, {n} left', 'انتهت بدري، باقي {n}'],
-  nextRound2: ['Round 2: double points', 'الجولة ٢: النقاط مضاعفة'],
-  nextFinal: ['Next: the final wager', 'التالي: الرهان الأخير'],
-  nextEnd: ['That’s the game', 'انتهت اللعبة'],
-  round2Sub: ['New categories, every value doubled. {team} (lowest score) picks first.', 'فئات جديدة وكل القيم مضاعفة. {team} (أقل نقاط) يختار أول.'],
-  finalSub: ['One category, one clue. Every team bets in secret.', 'فئة وحدة وتلميح واحد. كل فريق يراهن بالسر.'],
-  startRound2: ['Start round 2', 'ابدأ الجولة ٢'],
-  startFinal: ['Go to the final wager', 'روح للرهان الأخير'],
-  seeResults: ['See the results', 'شوف النتائج'],
-  finalWager: ['Final Wager', 'الرهان الأخير'],
-  finalCatHint: ['Announce the category. Teams think about how much to bet.', 'أعلن الفئة. الفرق تفكر كم تراهن.'],
-  startWagers: ['Collect the secret wagers', 'اجمع الرهانات السرية'],
-  wagersHint: ['Pass the phone to each team in turn. Nobody else looks.', 'مرّر الجوال لكل فريق بالدور. محد غيرهم يشوف.'],
-  maxWager: ['max {n}', 'حد أقصى {n}'],
-  enterWager: ['Enter wager', 'سجّل الرهان'],
-  locked: ['Locked', 'مثبّت'],
-  redo: ['Redo', 'أعد'],
-  redoQ: ['Redo {team}’s wager?', 'إعادة رهان {team}؟'],
-  redoBody: ['Their wager is cleared and they enter it again.', 'ينمسح رهانهم ويسجلونه من جديد.'],
-  passTo: ['Pass the phone to {team}', 'مرّر الجوال لـ {team}'],
-  passToSub: ['Only {team} should look at the screen.', 'بس {team} يشوفون الشاشة.'],
-  imTeam: ['We’re {team} — show', 'إحنا {team} — اعرض'],
-  yourWager: ['Your secret wager', 'رهانكم السري'],
-  finalWagerRule: ['Your score is {score}. Bet from 0 up to {max}.', 'نقاطكم {score}. راهنوا من ٠ إلى {max}.'],
-  wagerLocked: ['Wager locked', 'تم تثبيت الرهان'],
-  passBack: ['Pass the phone back to the host.', 'رجّع الجوال للمقدم.'],
-  imHost: ['I’m the host — continue', 'أنا المقدم — كمّل'],
-  showFinalClue: ['All in: show the final clue', 'الكل راهن: اعرض التلميح'],
-  finalWriteHint: ['Teams write their response before time runs out.', 'الفرق تكتب جوابها قبل ما يخلص الوقت.'],
-  startJudging: ['Time’s up: start judging', 'انتهى الوقت: ابدأ التحكيم'],
-  judgeNext: ['{team}: what did they write?', '{team}: وش كتبوا؟'],
-  judgingNow: ['Now', 'الحين'],
-  wagerWas: ['bet {n}', 'راهن {n}'],
-  finalTvCat: ['Think about your wager…', 'فكّروا في رهانكم…'],
-  finalTvWagers: ['Wagers are being placed in secret', 'الرهانات تنكتب بالسر'],
-  resultsTitle: ['Results', 'النتائج'],
-  finalScores: ['Final scores', 'النتيجة النهائية'],
-  winnerIs: ['The winner', 'الفائز'],
-  sharedWin: ['Shared win', 'فوز مشترك'],
-  itsADraw: ['It’s a draw!', 'تعادل!'],
-  rightShort: ['right', 'صح'],
-  wrongShort: ['wrong', 'غلط'],
-  gameLog: ['Game log', 'سجل اللعبة'],
-  logAdjust: ['Score fixed: {team} {d}', 'تعديل نقاط: {team} {d}'],
-  logVoid: ['(reversed)', '(أُلغي)'],
-  logInvalid: ['clue removed as wrong', 'انحذف التلميح لأنه غلط'],
-  logInvalidRep: ['clue replaced as wrong', 'استُبدل التلميح لأنه غلط'],
-  playAgain: ['Play again', 'العب مرة ثانية'],
-  playAgainSub: ['Same teams and rules, new boards.', 'نفس الفرق والقوانين، لوحات جديدة.'],
-  undo: ['Undo', 'تراجع'],
-  undoWhat: ['Undo {what}', 'تراجع عن {what}'],
-  nothingToUndo: ['Nothing to undo', 'ما فيه شي تتراجع عنه'],
-  pause: ['Pause the clock', 'وقّف الساعة'],
-  resume: ['Resume the clock', 'شغّل الساعة'],
-  putBack: ['Put it back', 'رجّعه للوحة'],
-  putBackSub: ['Opened by mistake: back on the board', 'انفتح بالغلط: يرجع للوحة'],
-  skipClue: ['Skip this clue', 'تخطَّ هذا التلميح'],
-  endRound: ['End this round now', 'أنهِ الجولة الحين'],
-  endRoundQ: ['End the round?', 'إنهاء الجولة؟'],
-  endRoundBody: ['The {n} clues left on this board are skipped.', 'الـ {n} تلميحات الباقية في اللوحة تنتخطّى.'],
-  endGame: ['End the game', 'أنهِ اللعبة'],
-  endGameQ: ['End the game now?', 'إنهاء اللعبة الحين؟'],
-  endGameBody: ['Scores stay as they are and the winner is shown.', 'النقاط تبقى مثل ما هي ويظهر الفائز.'],
-  quitHome: ['Home', 'الرئيسية'],
-  quitHomeSub: ['The game is saved. Continue it from the home screen.', 'اللعبة محفوظة. كمّلها من الرئيسية.'],
-  fixScores: ['Fix scores', 'تعديل النقاط'],
-  fixScoresSub: ['For mistakes. Every change is in the game log and can be undone.', 'للأخطاء. كل تعديل ينحفظ في السجل وتقدر تتراجع عنه.'],
-  fixStep: ['Step', 'الخطوة'],
-  setScoreTo: ['Set to…', 'خلّه…'],
-  setScoreFor: ['Set the score for {team}', 'حدد نقاط {team}'],
-  setScore: ['Set', 'حدد'],
-  undoLastFix: ['Undo the last fix', 'تراجع عن آخر تعديل'],
-  fixWrongTip: ['A clue that was itself wrong? Use “This is wrong”: it reverses exactly what that clue did.', 'التلميح نفسه غلط؟ استخدم «هذا غلط»: يرجّع بالضبط اللي سواه التلميح.'],
-  editScoreOf: ['Fix the score of {team}', 'عدّل نقاط {team}'],
-  sndMute: ['Mute sounds', 'كتم الأصوات'],
-  sndUnmute: ['Turn sounds on', 'شغّل الأصوات'],
-  thisIsWrong: ['This is wrong', 'هذا غلط'],
-  flagPlayed: ['Flag a played clue', 'بلّغ عن تلميح انلعب'],
-  flagPlayedSub: ['Pick the clue that was wrong. Its points are reversed.', 'اختر التلميح الغلط. نقاطه ترجع.'],
-  noPlayed: ['No clues played yet.', 'ما انلعب أي تلميح.'],
-  wrongTitle: ['This clue is wrong', 'هذا التلميح غلط'],
-  whyWrong: ['What’s wrong?', 'وش الغلط؟'],
-  reason_answer: ['Wrong response', 'الجواب غلط'],
-  reason_unclear: ['Unclear / two answers', 'غير واضح / له جوابين'],
-  reason_duplicate: ['Already had it', 'تكرر'],
-  reason_other: ['Something else', 'شي ثاني'],
-  wrongNote: ['A note (optional)', 'ملاحظة (اختياري)'],
-  willRefund: ['These changes will be reversed:', 'هذي التغييرات بترجع:'],
-  refundLine: ['{team} {d}', '{team} {d}'],
-  noRefund: ['No points changed hands on this clue.', 'ما تغيرت نقاط في هذا التلميح.'],
-  repSame: ['Replace it with another {cat} clue', 'استبدله بتلميح ثاني من {cat}'],
-  repOther: ['Replace it with a clue from {cat}', 'استبدله بتلميح من {cat}'],
-  repNow: ['The new clue opens straight away.', 'التلميح الجديد ينفتح على طول.'],
-  repBoard: ['The tile goes back on the board.', 'الخانة ترجع للوحة.'],
-  repEmpty: ['The tile is left empty.', 'الخانة تبقى فاضية.'],
-  repNone: ['No replacement left in this row: the tile is left empty.', 'ما بقى بديل في هذا الصف: الخانة تبقى فاضية.'],
-  repPlayedOnly: ['That board is finished, so the points are reversed and nothing replaces it.', 'اللوحة خلصت، فالنقاط ترجع وما فيه بديل.'],
-  repFinalSame: ['A new final clue from the same category ({cat}). Wagers stay.', 'تلميح أخير جديد من نفس الفئة ({cat}). الرهانات تبقى.'],
-  repFinalOther: ['A new final clue from {cat}. Wagers stay.', 'تلميح أخير جديد من {cat}. الرهانات تبقى.'],
-  repFinalNone: ['No replacement final clue is left.', 'ما بقى تلميح أخير بديل.'],
-  reverseIt: ['Reverse it', 'رجّع النقاط'],
-  removeIt: ['Remove it', 'احذفه'],
-  wrongDone: ['Clue removed.', 'انحذف التلميح.'],
-  wrongDoneRefund: ['Clue removed and its points reversed.', 'انحذف التلميح ورجعت نقاطه.'],
-  tvMode: ['TV mode', 'وضع التلفزيون'],
-  tvIntro: ['Show the board big on a TV. Answers and wagers never appear there before they’re revealed.', 'اعرض اللوحة كبيرة على التلفزيون. الأجوبة والرهانات ما تظهر قبل وقتها.'],
-  tvHere: ['Use this screen as the TV', 'استخدم هذي الشاشة كتلفزيون'],
-  tvHereSub: ['For a laptop plugged into the TV, or casting this screen.', 'للابتوب موصول بالتلفزيون، أو إذا تبث هذي الشاشة.'],
-  tvWindow: ['Open a TV window', 'افتح نافذة للتلفزيون'],
-  tvWindowSub: ['A second window in this browser (drag it onto the TV). This one stays the remote.', 'نافذة ثانية في نفس المتصفح (اسحبها للتلفزيون). هذي تبقى الريموت.'],
-  tvOtherDevice: ['A TV on another device needs online rooms, which aren’t built yet.', 'تلفزيون على جهاز ثاني يحتاج غرف أونلاين، وهذي مو جاهزة.'],
-  tvNoChannel: ['This browser can’t link two windows. Use “this screen as the TV” instead.', 'هذا المتصفح ما يقدر يربط نافذتين. استخدم «هذي الشاشة كتلفزيون».'],
-  tvBlocked: ['The window was blocked. Allow pop-ups for this site.', 'النافذة انحجبت. اسمح بالنوافذ المنبثقة.'],
-  tvFull: ['Full screen', 'ملء الشاشة'],
-  tvBackToControls: ['Back to controls', 'رجوع للتحكم'],
-  tvWaiting: ['Waiting for the host…', 'ننتظر المقدم…'],
-  tvAllowSound: ['Allow sound', 'اسمح بالصوت'],
-  language: ['Language', 'اللغة'],
-  qLang: ['Clue language', 'لغة التلميحات'],
-  qLangAuto: ['Same as the game', 'نفس لغة اللعبة'],
-  qLangBoth: ['Both languages', 'اللغتين'],
-  qLangSub: ['“Both” shows the other language under each clue.', '«اللغتين» تعرض اللغة الثانية تحت كل تلميح.'],
-  hostPeek: ['Show the response to the host', 'اعرض الجواب للمقدم'],
-  hostPeekSub: ['Turn off if the host is playing too.', 'طفّها إذا المقدم يلعب معهم.'],
-  motion: ['Animations', 'الحركة'],
-  motionSystem: ['System', 'حسب الجهاز'],
-  motionFull: ['On', 'تشغيل'],
-  motionReduce: ['Less', 'أقل'],
-  tvZoom: ['TV text size', 'حجم خط التلفزيون'],
-  qbank: ['Clue bank', 'بنك التلميحات'],
-  historySub: ['{n} clues seen on this device over {g} games. Seen clues come up less often.', '{n} تلميح ظهر على هذا الجهاز في {g} لعبة. اللي ظهرت تطلع أقل.'],
-  resetHistory: ['Forget seen clues', 'انسَ التلميحات اللي ظهرت'],
-  resetHistoryQ: ['Forget seen clues?', 'نسيان التلميحات؟'],
-  resetHistoryBody: ['Every clue can come up again as if new.', 'كل التلميحات ممكن تطلع من جديد.'],
-  issues: ['Reported clues', 'التلميحات المبلّغ عنها'],
-  issuesSub: ['Clues flagged with “This is wrong” on this device.', 'التلميحات اللي انبلّغ عنها بـ«هذا غلط» على هذا الجهاز.'],
-  issuesN: ['{n} reported', '{n} بلاغ'],
-  issuesNone: ['Nothing reported.', 'ما فيه بلاغات.'],
-  skipReported: ['Don’t use reported clues again', 'لا تستخدم التلميحات المبلّغ عنها'],
-  exportIssues: ['Export the list', 'صدّر القائمة'],
-  clearIssues: ['Clear the list', 'امسح القائمة'],
-  clearIssuesQ: ['Clear the reported list?', 'مسح قائمة البلاغات؟'],
-  clearIssuesBody: ['Those clues can come up again.', 'هذي التلميحات ممكن تطلع مرة ثانية.'],
-  backup: ['Backup', 'النسخ الاحتياطي'],
-  backupSub: ['Save settings, the current game, recent games and history to a file, or load them back.', 'احفظ الإعدادات واللعبة الحالية والألعاب والسجل في ملف، أو استرجعها.'],
-  exportBackup: ['Save backup', 'حفظ نسخة'],
-  importBackup: ['Load backup', 'استرجاع نسخة'],
-  importQ: ['Load this backup?', 'استرجاع هذي النسخة؟'],
-  importBody: ['{past} recent games {cur}from {date}. It replaces what’s on this device.', '{past} لعبة {cur}من {date}. تستبدل اللي على الجهاز.'],
-  importCur: ['and a game in progress ', 'ولعبة جارية '],
-  restored: ['Backup loaded.', 'تم الاسترجاع.'],
-  bkUnreadable: ['That file couldn’t be read.', 'ما قدرنا نقرأ الملف.'],
-  bkNotOurs: ['That isn’t a Jeopardy-Board backup.', 'هذا مو ملف نسخة من Jeopardy-Board.'],
-  bkNewer: ['That backup is from a newer version. Update the game first.', 'النسخة من إصدار أحدث. حدّث اللعبة أول.'],
-  bkDamaged: ['That backup is damaged.', 'النسخة تالفة.'],
-  storage: ['Storage', 'التخزين'],
-  storageWhere: ['Saved on this device in {b}. Nothing is sent anywhere.', 'محفوظ على هذا الجهاز في {b}. ما يترسل شي لأي مكان.'],
-  storeFull: ['This device is out of storage space.', 'مساحة الجهاز ممتلئة.'],
-  storeFail: ['Couldn’t save on this device.', 'ما قدرنا نحفظ على الجهاز.'],
-  installIos: ['On iPhone: Share → Add to Home Screen keeps your games safer.', 'على الآيفون: مشاركة ← إضافة للشاشة الرئيسية تحفظ ألعابك أكثر.'],
-  clearAll: ['Delete everything', 'احذف كل شي'],
-  clearAllQ: ['Delete everything?', 'حذف كل شي؟'],
-  clearAllBody: ['Settings, games, history and recordings on this device are deleted.', 'الإعدادات والألعاب والسجل والتسجيلات على هذا الجهاز تنحذف.'],
-  deleteIt: ['Delete', 'احذف'],
-  credits: ['Credits', 'الحقوق'],
-  creditsBody: ['Jeopardy-Board is an independent fan-made game, not affiliated with or endorsed by the Jeopardy! TV show, and uses none of its music, logo, set design or catchphrases. Fonts: Anton, Barlow, Barlow Semi Condensed and Cairo (SIL Open Font License). Built-in sounds are generated in the browser. Clues are written for this game.', 'Jeopardy-Board لعبة مستقلة من صنع معجبين، وما لها علاقة ببرنامج Jeopardy! التلفزيوني ولا تستخدم موسيقاه أو شعاره أو ديكوره أو عباراته. الخطوط: Anton و Barlow و Barlow Semi Condensed و Cairo (رخصة SIL المفتوحة). الأصوات المدمجة تتولد في المتصفح. التلميحات مكتوبة لهذي اللعبة.'],
-  version: ['Version {v}', 'الإصدار {v}'],
-  sndTitle: ['Sound', 'الصوت'],
-  sndOnTap: ['Sound is on (tap to mute)', 'الصوت شغال (اضغط للكتم)'],
-  sndMutedTap: ['Muted (tap for sound)', 'مكتوم (اضغط للتشغيل)'],
-  sndVolume: ['Volume', 'مستوى الصوت'],
-  sndBuiltin: ['Built-in sounds', 'الأصوات المدمجة'],
-  sndBuiltinSub: ['Simple sounds made in the browser, used when there’s no recording for an event.', 'أصوات بسيطة يصنعها المتصفح، تُستخدم لما ما فيه تسجيل.'],
-  sndTest: ['Test the sound', 'جرّب الصوت'],
-  sndWhere: ['With a TV window open, sound plays there only. Otherwise on this device.', 'إذا نافذة التلفزيون مفتوحة، الصوت يطلع منها بس. غير كذا من هذا الجهاز.'],
-  sndEvents: ['Sounds for each moment', 'صوت لكل لحظة'],
-  sndEventsSub: ['Upload your own clip (up to 20 s, 3 MB). Only use sounds you made or may use.', 'ارفع مقطعك (حتى ٢٠ ثانية و٣ ميغا). استخدم بس أصوات من صنعك أو مسموح لك فيها.'],
-  sndVoiceIdea: ['good spot for a voice line', 'مكان مناسب لتعليق صوتي'],
-  sndSrcCustom: ['Your recording', 'تسجيلك'],
-  sndSrcFile: ['File in sounds/', 'ملف في sounds/'],
-  sndSrcBuiltin: ['Built-in', 'مدمج'],
-  sndSrcNone: ['Silent', 'صامت'],
-  sndPreview: ['Play', 'تشغيل'],
-  sndUpload: ['Upload', 'رفع'],
-  sndReplace: ['Replace', 'استبدال'],
-  sndRemove: ['Remove', 'حذف'],
-  sndSaved: ['Saved.', 'انحفظ.'],
-  sndTooBig: ['That file is over 3 MB.', 'الملف أكبر من ٣ ميغا.'],
-  sndTooLong: ['That clip is over 20 seconds.', 'المقطع أطول من ٢٠ ثانية.'],
-  sndNotAudio: ['That isn’t an audio file.', 'هذا مو ملف صوت.'],
-  sndUnsupported: ['This browser can’t play that file. Try MP3 or M4A.', 'المتصفح ما يقدر يشغّله. جرّب MP3 أو M4A.'],
-  sndStorage: ['Recordings are saved in this browser only, and aren’t in backups.', 'التسجيلات محفوظة في هذا المتصفح بس، وما تدخل في النسخ الاحتياطي.'],
-  howBody: [['One phone is the host’s remote. Show the board on a TV (📺): the TV never shows a response or a wager before it’s revealed.', 'Each round has a board of 6 categories × 5 clues. Higher values are harder. Round 2 has new categories and doubles every value.', 'The picking team calls a category and value. The host reads the clue out loud: it’s a statement, and teams give the short response.', 'Teams buzz out loud. The host taps who was first. Right = + the value, and that team picks next. Wrong = − the value, and the other teams can buzz.', 'If nobody gets it, the host shows the response and the same team picks again.', 'Risk It! squares are hidden on the board: 1 in round 1, 2 in round 2. Only the team that found it plays: it bets up to its score (or the round’s top value if that’s more), then sees the clue.', 'Final Wager: one category, then each team secretly bets on the phone, passed round with the screen hidden between teams. Then the clue, a timer, and the host judges each team, lowest score first.', 'Mistakes: Undo in the menu, Fix scores, or “This is wrong” on a bad clue, which reverses exactly what that clue did.'], ['جوال واحد يكون ريموت المقدم. اعرض اللوحة على التلفزيون (📺): التلفزيون ما يعرض جواب أو رهان قبل وقته.', 'كل جولة فيها لوحة من ٦ فئات × ٥ تلميحات. كل ما زادت القيمة صعب التلميح. الجولة ٢ فيها فئات جديدة وتضاعف كل القيم.', 'الفريق اللي عليه الدور يختار فئة وقيمة. المقدم يقرأ التلميح بصوت عالي: هو جملة، والفرق تعطي الجواب القصير.', 'الفرق تضغط بصوتها. المقدم يختار مين كان أول. صح = + القيمة والفريق يختار بعدها. غلط = − القيمة والفرق الثانية تقدر تضغط.', 'إذا محد عرفها، المقدم يعرض الجواب ونفس الفريق يختار مرة ثانية.', 'خانات «خاطِر!» مخفية في اللوحة: وحدة في الجولة ١ واثنتين في الجولة ٢. بس الفريق اللي لقاها يلعبها: يراهن لين نقاطه (أو أعلى قيمة في الجولة إذا أكثر)، وبعدين يشوف التلميح.', 'الرهان الأخير: فئة وحدة، وكل فريق يراهن بالسر على الجوال وهو يتمرر مع شاشة مخفية بين الفرق. بعدها التلميح والمؤقت، والمقدم يحكم على كل فريق من الأقل نقاطاً.', 'الأخطاء: تراجع من القائمة، أو تعديل النقاط، أو «هذا غلط» على التلميح الخربان، ويرجع بالضبط اللي سواه.']]
-};
-let LANG = 'en';
-const setLang = l => {
-  LANG = l === 'en' ? 'en' : 'ar';
+  appName: 'Jeopardy-Board',
+  tagline: 'Pick a clue, buzz in first, and bet it all in the final round.',
+  gameNight: 'Game night',
+  newGame: 'New game',
+  continueGame: 'Continue game',
+  resumeRound: 'round {n} · {left} clues left',
+  resumeFinal: 'final wager',
+  howToPlay: 'How to play',
+  settings: 'Settings',
+  back: 'Back',
+  close: 'Close',
+  cancel: 'Cancel',
+  confirm: 'Confirm',
+  done: 'Done',
+  dismiss: 'OK',
+  menu: 'Menu',
+  home: 'Home',
+  reload: 'Reload',
+  install: 'Install on this device',
+  updateReady: 'A new version is ready.',
+  pastGames: 'Recent games',
+  won: 'won',
+  draw: 'Draw',
+  bankNote: '{q} clues in {c} categories.',
+  crashed: 'Something went wrong',
+  crashedSub: 'Your game is saved. Reload to carry on.',
+  seconds: '{n}s',
+  setupTitle: 'New game',
+  teams: 'Teams',
+  teamN: 'Team {n}',
+  defaultTeam1: 'Falcons',
+  defaultTeam2: 'Leopards',
+  addTeam: 'Add a team (up to 4)',
+  removeTeam: 'Remove team {n}',
+  changeEmoji: 'Change emoji',
+  colour: 'Colour',
+  categories: 'Categories',
+  catsOn: '{n} of {of} categories on',
+  catsPerGame: '{n} per game',
+  chooseCats: 'Choose categories',
+  chooseCatsSub: 'Switched-on categories can come up. A game uses {n}.',
+  catsRandom: 'Each board gets 6 categories at random from the ones switched on, mixing topics and avoiding recent ones.',
+  cluesN: '{n} clues',
+  allOn: 'All on',
+  allOff: 'All off',
+  gameRules: 'Game rules',
+  rulesSummary: '{r} round(s) · {f} · {v}',
+  withFinal: 'final wager',
+  noFinal: 'no final',
+  rounds: 'Rounds',
+  oneRound: '1 round',
+  twoRounds: '2 rounds',
+  values: 'Points per row (round 1)',
+  valuesSub: 'Round 2 doubles them: {r2}.',
+  rowN: 'Row {n} points',
+  finalRound: 'Final wager round',
+  finalRoundSub: 'One last clue. Every team secretly bets on it.',
+  finalTime: 'Time to write the final response',
+  questionForm: 'Responses must be a question',
+  questionFormSub: 'Teams answer “What is…?” / “Who is…?”. You judge.',
+  modifiers: 'Optional modifiers',
+  modifiersOff: 'All off',
+  noMinus: 'No minus points',
+  noMinusSub: 'A wrong answer on a normal clue costs nothing. (Risk It and the final still count.)',
+  answerClock: 'Answer clock',
+  answerClockSub: 'A countdown starts when a team buzzes in.',
+  answerTime: 'Time to answer',
+  strictRepeats: 'Strict no-repeats',
+  strictRepeatsSub: 'Never reuse a clue seen in the last 50 games on this device, until a category runs out.',
+  needNames: 'Every team needs a name.',
+  needAscending: 'Points must go up from row 1 to row 5.',
+  needCats: 'Switch on more categories: {have} can fill a board, the game needs {need}.',
+  startGame: 'Start the game',
+  roundN: 'Round {n}',
+  roundLeft: 'Round {n} · {left} left',
+  picksNext: '{team} picks a clue',
+  picksShort: 'Picks',
+  boardHint: 'Tap the tile the picking team calls out.',
+  reportShort: '{n} tiles are empty: not enough clues left in those categories.',
+  tileEmpty: 'no clue left',
+  tileInvalid: 'removed as wrong',
+  buzzNow: 'Read the clue. Who buzzed first?',
+  othersBuzz: 'The other teams can buzz now.',
+  whoBuzzed: 'Who buzzed first?',
+  nobody: 'Nobody — show the response',
+  nobodyElse: 'Nobody else — show the response',
+  answering: '{team} is answering',
+  right: 'Right',
+  wrong: 'Wrong',
+  wrongTeamTapped: 'Wrong team? Undo the buzz',
+  response: 'Response',
+  alsoAccept: 'Also accept:',
+  asOf: 'True as of {d}',
+  needsCheck: '⏳ Time-sensitive (as of {d}): check before trusting it',
+  showResponse: 'Show the response (host)',
+  hideResponse: 'Hide the response',
+  qFormReminder: 'Answer in the form of a question',
+  qFormJudge: 'Only accept it if it was phrased as a question.',
+  flashRight: 'Right!',
+  flashWrong: 'Wrong',
+  flashNone: 'Nobody',
+  flashInvalid: 'Clue removed',
+  nobodyGotIt: 'Nobody got it',
+  skipped: 'Skipped',
+  pointsTo: '+{n} to {team}',
+  lostPoints: '−{n} for {team}',
+  backToBoard: 'Back to the board',
+  endOfRound: 'End of the round',
+  timeUp: 'Time!',
+  riskIt: 'Risk It!',
+  riskItSub: 'A hidden wager square',
+  riskWagering: '{team} found a Risk It square',
+  riskWagerQ: 'How much does {team} risk?',
+  riskWagerRule: 'Score {score}. Bet anything from 0 up to {max} (your score, or the round’s top value if that’s more).',
+  riskHidden: 'Only this team plays it. The clue appears once the wager is locked.',
+  wager: 'Wager',
+  allIn: 'All in ({n})',
+  wagerRange: 'Enter a whole number from 0 to {max}.',
+  lockWager: 'Lock the wager',
+  bestRisk: 'Biggest Risk It won',
+  roundOver: 'End of round {n}',
+  cutShort: 'ended early, {n} left',
+  nextRound2: 'Round 2: double points',
+  nextFinal: 'Next: the final wager',
+  nextEnd: 'That’s the game',
+  round2Sub: 'New categories, every value doubled. {team} (lowest score) picks first.',
+  finalSub: 'One category, one clue. Every team bets in secret.',
+  startRound2: 'Start round 2',
+  startFinal: 'Go to the final wager',
+  seeResults: 'See the results',
+  finalWager: 'Final Wager',
+  finalCatHint: 'Announce the category. Teams think about how much to bet.',
+  startWagers: 'Collect the secret wagers',
+  wagersHint: 'Pass the phone to each team in turn. Nobody else looks.',
+  maxWager: 'max {n}',
+  enterWager: 'Enter wager',
+  locked: 'Locked',
+  redo: 'Redo',
+  redoQ: 'Redo {team}’s wager?',
+  redoBody: 'Their wager is cleared and they enter it again.',
+  passTo: 'Pass the phone to {team}',
+  passToSub: 'Only {team} should look at the screen.',
+  imTeam: 'We’re {team} — show',
+  yourWager: 'Your secret wager',
+  finalWagerRule: 'Your score is {score}. Bet from 0 up to {max}.',
+  wagerLocked: 'Wager locked',
+  passBack: 'Pass the phone back to the host.',
+  imHost: 'I’m the host — continue',
+  showFinalClue: 'All in: show the final clue',
+  finalWriteHint: 'Teams write their response before time runs out.',
+  startJudging: 'Time’s up: start judging',
+  judgeNext: '{team}: what did they write?',
+  judgingNow: 'Now',
+  wagerWas: 'bet {n}',
+  finalTvCat: 'Think about your wager…',
+  finalTvWagers: 'Wagers are being placed in secret',
+  resultsTitle: 'Results',
+  finalScores: 'Final scores',
+  winnerIs: 'The winner',
+  sharedWin: 'Shared win',
+  itsADraw: 'It’s a draw!',
+  rightShort: 'right',
+  wrongShort: 'wrong',
+  gameLog: 'Game log',
+  logAdjust: 'Score fixed: {team} {d}',
+  logVoid: '(reversed)',
+  logInvalid: 'clue removed as wrong',
+  logInvalidRep: 'clue replaced as wrong',
+  playAgain: 'Play again',
+  playAgainSub: 'Same teams and rules, new boards.',
+  undo: 'Undo',
+  undoWhat: 'Undo {what}',
+  nothingToUndo: 'Nothing to undo',
+  pause: 'Pause the clock',
+  resume: 'Resume the clock',
+  putBack: 'Put it back',
+  putBackSub: 'Opened by mistake: back on the board',
+  skipClue: 'Skip this clue',
+  endRound: 'End this round now',
+  endRoundQ: 'End the round?',
+  endRoundBody: 'The {n} clues left on this board are skipped.',
+  endGame: 'End the game',
+  endGameQ: 'End the game now?',
+  endGameBody: 'Scores stay as they are and the winner is shown.',
+  quitHome: 'Home',
+  quitHomeSub: 'The game is saved. Continue it from the home screen.',
+  fixScores: 'Fix scores',
+  fixScoresSub: 'For mistakes. Every change is in the game log and can be undone.',
+  fixStep: 'Step',
+  setScoreTo: 'Set to…',
+  setScoreFor: 'Set the score for {team}',
+  setScore: 'Set',
+  undoLastFix: 'Undo the last fix',
+  fixWrongTip: 'A clue that was itself wrong? Use “This is wrong”: it reverses exactly what that clue did.',
+  editScoreOf: 'Fix the score of {team}',
+  sndMute: 'Mute sounds',
+  sndUnmute: 'Turn sounds on',
+  thisIsWrong: 'This is wrong',
+  flagPlayed: 'Flag a played clue',
+  flagPlayedSub: 'Pick the clue that was wrong. Its points are reversed.',
+  noPlayed: 'No clues played yet.',
+  wrongTitle: 'This clue is wrong',
+  whyWrong: 'What’s wrong?',
+  reason_answer: 'Wrong response',
+  reason_unclear: 'Unclear / two answers',
+  reason_duplicate: 'Already had it',
+  reason_other: 'Something else',
+  wrongNote: 'A note (optional)',
+  willRefund: 'These changes will be reversed:',
+  refundLine: '{team} {d}',
+  noRefund: 'No points changed hands on this clue.',
+  repSame: 'Replace it with another {cat} clue',
+  repOther: 'Replace it with a clue from {cat}',
+  repNow: 'The new clue opens straight away.',
+  repBoard: 'The tile goes back on the board.',
+  repEmpty: 'The tile is left empty.',
+  repNone: 'No replacement left in this row: the tile is left empty.',
+  repPlayedOnly: 'That board is finished, so the points are reversed and nothing replaces it.',
+  repFinalSame: 'A new final clue from the same category ({cat}). Wagers stay.',
+  repFinalOther: 'A new final clue from {cat}. Wagers stay.',
+  repFinalNone: 'No replacement final clue is left.',
+  reverseIt: 'Reverse it',
+  removeIt: 'Remove it',
+  wrongDone: 'Clue removed.',
+  wrongDoneRefund: 'Clue removed and its points reversed.',
+  tvMode: 'TV mode',
+  tvIntro: 'Show the board big on a TV. Answers and wagers never appear there before they’re revealed.',
+  tvHere: 'Use this screen as the TV',
+  tvHereSub: 'For a laptop plugged into the TV, or casting this screen.',
+  tvWindow: 'Open a TV window',
+  tvWindowSub: 'A second window in this browser (drag it onto the TV). This one stays the remote.',
+  tvOtherDevice: 'A TV on another device needs online rooms, which aren’t built yet.',
+  tvNoChannel: 'This browser can’t link two windows. Use “this screen as the TV” instead.',
+  tvBlocked: 'The window was blocked. Allow pop-ups for this site.',
+  tvFull: 'Full screen',
+  tvBackToControls: 'Back to controls',
+  tvWaiting: 'Waiting for the host…',
+  tvAllowSound: 'Allow sound',
+  hostPeek: 'Show the response to the host',
+  hostPeekSub: 'Turn off if the host is playing too.',
+  motion: 'Animations',
+  motionSystem: 'System',
+  motionFull: 'On',
+  motionReduce: 'Less',
+  tvZoom: 'TV text size',
+  qbank: 'Clue bank',
+  historySub: '{n} clues seen on this device over {g} games. Seen clues come up less often.',
+  resetHistory: 'Forget seen clues',
+  resetHistoryQ: 'Forget seen clues?',
+  resetHistoryBody: 'Every clue can come up again as if new.',
+  issues: 'Reported clues',
+  issuesSub: 'Clues flagged with “This is wrong” on this device.',
+  issuesN: '{n} reported',
+  issuesNone: 'Nothing reported.',
+  skipReported: 'Don’t use reported clues again',
+  exportIssues: 'Export the list',
+  clearIssues: 'Clear the list',
+  clearIssuesQ: 'Clear the reported list?',
+  clearIssuesBody: 'Those clues can come up again.',
+  backup: 'Backup',
+  backupSub: 'Save settings, the current game, recent games, history and your clue packs to a file, or load them back. Your sound recordings in Settings aren’t included.',
+  exportBackup: 'Save backup',
+  importBackup: 'Load backup',
+  importQ: 'Load this backup?',
+  importBody: '{past} recent games {cur}and {packs} clue packs, from {date}. It replaces what’s on this device.',
+  importCur: 'and a game in progress ',
+  restored: 'Backup loaded.',
+  bkUnreadable: 'That file couldn’t be read.',
+  bkNotOurs: 'That isn’t a Jeopardy-Board backup.',
+  bkNewer: 'That backup is from a newer version. Update the game first.',
+  bkDamaged: 'That backup is damaged.',
+  storage: 'Storage',
+  storageWhere: 'Saved on this device in {b}. Nothing is sent anywhere.',
+  storeFull: 'This device is out of storage space.',
+  storeFail: 'Couldn’t save on this device.',
+  installIos: 'On iPhone: Share → Add to Home Screen keeps your games safer.',
+  clearAll: 'Delete everything',
+  clearAllQ: 'Delete everything?',
+  clearAllBody: 'Settings, games, history and recordings on this device are deleted.',
+  deleteIt: 'Delete',
+  credits: 'Credits',
+  creditsBody: 'Jeopardy-Board is an independent fan-made game, not affiliated with or endorsed by the Jeopardy! TV show, and uses none of its music, logo, set design or catchphrases. Fonts: Anton, Barlow, Barlow Semi Condensed (SIL Open Font License). Game sound effects are generated in the browser. Picture and sound clues: flags from flag-icons (MIT), country outlines from Natural Earth (public domain), sounds by Kenney and Ben Burnes (CC0) plus generated tones. Clues are written for this game.',
+  version: 'Version {v}',
+  sndTitle: 'Sound',
+  sndOnTap: 'Sound is on (tap to mute)',
+  sndMutedTap: 'Muted (tap for sound)',
+  sndVolume: 'Volume',
+  sndBuiltin: 'Built-in sounds',
+  sndBuiltinSub: 'Simple sounds made in the browser, used when there’s no recording for an event.',
+  sndTest: 'Test the sound',
+  sndWhere: 'With a TV window open, sound plays there only. Otherwise on this device.',
+  sndEvents: 'Sounds for each moment',
+  sndEventsSub: 'Upload your own clip (up to 20 s, 3 MB). Only use sounds you made or may use.',
+  sndVoiceIdea: 'good spot for a voice line',
+  sndSrcCustom: 'Your recording',
+  sndSrcFile: 'File in sounds/',
+  sndSrcBuiltin: 'Built-in',
+  sndSrcNone: 'Silent',
+  sndPreview: 'Play',
+  sndUpload: 'Upload',
+  sndReplace: 'Replace',
+  sndRemove: 'Remove',
+  sndSaved: 'Saved.',
+  sndTooBig: 'That file is over 3 MB.',
+  sndTooLong: 'That clip is over 20 seconds.',
+  sndNotAudio: 'That isn’t an audio file.',
+  sndUnsupported: 'This browser can’t play that file. Try MP3 or M4A.',
+  sndStorage: 'Recordings are saved in this browser only, and aren’t in backups.',
+  type_text: 'Text',
+  type_image: 'Picture',
+  type_audio: 'Sound',
+  pictureAlt: 'Picture for this clue',
+  mediaFailedShort: 'The picture couldn’t load.',
+  mediaMissing: 'The file is missing from this browser.',
+  mediaFailed: 'The file couldn’t be played.',
+  mPlay: 'Play',
+  mPause: 'Pause',
+  mResume: 'Resume',
+  mReplay: 'Replay',
+  mVolume: 'Volume',
+  mIdle: 'Press Play when you’re ready.',
+  mReady: 'Ready.',
+  mPlaying: 'Playing…',
+  mPaused: 'Paused.',
+  mEnded: 'Finished.',
+  mBlocked: 'The browser blocked the sound: tap “Allow sound” on the TV, then Play.',
+  mError: 'Something went wrong.',
+  playsHere: 'Plays on this device',
+  playsOnTv: 'Plays on the TV window',
+  previewOnTv: 'Preview',
+  myClues: 'My clues',
+  myCluesSub: 'Make your own clue packs. Switched-on packs mix into the game: in built-in categories, or in your own categories once each of the five rows has a clue.',
+  newPack: 'New pack',
+  newPackName: 'My pack {n}',
+  noPacks: 'No packs yet.',
+  importPack: 'Import a pack',
+  exportPack: 'Export',
+  deletePack: 'Delete pack',
+  deletePackQ: 'Delete this pack?',
+  deletePackBody: 'Its {n} clues and their pictures and sounds are deleted from this device.',
+  packInGames: 'Use in games',
+  packCatsN: '{n} categories',
+  packNoCats: 'no own categories',
+  packName: 'Pack name',
+  packCategories: 'Your categories',
+  packCategoriesSub: 'A category goes on a board once it has a clue in every row (200–1000).',
+  rowsMissing: 'needs clues for {list}',
+  readyForBoard: 'ready for the board',
+  addCategory: 'Add a category',
+  editCategory: 'Edit category',
+  categoryName: 'Category name',
+  emoji: 'Emoji',
+  deleteCategory: 'Delete category',
+  categoryInUse: 'Move or delete its {n} clues first.',
+  all: 'All',
+  incomplete: 'incomplete',
+  noCluesYet: 'No clues in this pack yet.',
+  chooseType: 'What kind of clue?',
+  addClue: 'Add a clue',
+  deleteClue: 'Delete clue',
+  deleteClueQ: 'Delete this clue?',
+  category: 'Category',
+  chooseCategory: 'Choose a category…',
+  thisPack: 'This pack',
+  rowLabel: 'Row (difficulty)',
+  rowSub: 'Row 1 is the easiest. In a game the points follow the setup (round 2 doubles them).',
+  picture: 'Picture',
+  choosePicture: 'Choose a picture',
+  replacePicture: 'Replace the picture',
+  pictureRights: 'Only use pictures you took or are allowed to use. Big photos are shrunk to fit.',
+  sound: 'Sound',
+  chooseSound: 'Choose a sound',
+  replaceSound: 'Replace the sound',
+  soundLength: '{s} seconds long.',
+  soundRights: 'Only use sounds you made or are allowed to use. MP3 or M4A plays everywhere.',
+  clueText: 'Clue',
+  clueTextPh: 'A statement, e.g. “This planet is known for its rings.”',
+  responseText: 'Response',
+  responseTextPh: 'The short answer, e.g. Saturn',
+  alsoAcceptField: 'Also accept',
+  alsoAcceptPh: 'Other answers, separated by commas',
+  noteField: 'Note shown after the response',
+  sourceField: 'Source (where you checked it)',
+  sourcePh: 'A link or a book',
+  previewLabel: 'Preview',
+  previewOnTvBtn: 'Preview on the TV window',
+  stopTvPreview: 'Stop the TV preview',
+  previewTvHint: 'Open a TV window (📺 during a game) to preview there too.',
+  save: 'Save',
+  working: 'Working…',
+  vPoints: 'Choose a row.',
+  vCat: 'Choose a category.',
+  vClue: 'Write the clue.',
+  vResponse: 'Write the response.',
+  vResponseQuestion: 'Write the plain response (“Saturn”), not a question.',
+  vNoPicture: 'Choose a picture.',
+  vNoSound: 'Choose a sound.',
+  vMediaMissing: 'The picture or sound is missing from this browser. Choose it again.',
+  vNotImage: 'That isn’t a picture.',
+  vTooBig: 'That picture is over 8 MB.',
+  vTooBigAudio: 'That sound is over 5 MB.',
+  vLongSound: 'That sound is over 30 seconds. It will work, but short clips play better.',
+  vUnsupported: 'This browser can’t open that file.',
+  vTooBigPack: 'That file is too big to be a pack.',
+  pkNotPack: 'That isn’t a Jeopardy-Board clue pack.',
+  pkBadPoints: 'That pack has clues with values that aren’t 200–1000.',
+  importPackQ: 'Import “{name}”?',
+  importPackBody: '{clues} clues, {cats} categories, {media} pictures/sounds.',
+  importPackBad: '{bad} of them are incomplete and won’t be used until fixed.',
+  packImported: '“{name}” imported.',
+  packStorageNote: 'Packs live in this browser. Export them (or save a backup in Settings) to keep a copy.',
+  howBody: ['One phone is the host’s remote. Show the board on a TV (📺): the TV never shows a response or a wager before it’s revealed.', 'Each round has a board of 6 categories × 5 clues. Higher values are harder. Round 2 has new categories and doubles every value.', 'The picking team calls a category and value. The host reads the clue out loud: it’s a statement, and teams give the short response.', 'Teams buzz out loud. The host taps who was first. Right = + the value, and that team picks next. Wrong = − the value, and the other teams can buzz.', 'If nobody gets it, the host shows the response and the same team picks again.', 'Risk It! squares are hidden on the board: 1 in round 1, 2 in round 2. Only the team that found it plays: it bets up to its score (or the round’s top value if that’s more), then sees the clue.', 'Final Wager: one category, then each team secretly bets on the phone, passed round with the screen hidden between teams. Then the clue, a timer, and the host judges each team, lowest score first.', 'Mistakes: Undo in the menu, Fix scores, or “This is wrong” on a bad clue, which reverses exactly what that clue did.']
 };
 function t(key, vars) {
-  const e = S[key];
-  let s = e ? LANG === 'ar' ? e[1] : e[0] : key;
+  let s = S[key] != null ? S[key] : key;
   if (vars && typeof s === 'string') Object.keys(vars).forEach(k => {
     s = s.split('{' + k + '}').join(vars[k]);
   });
   return s;
 }
-function pick(obj, lang) {
-  if (obj == null) return '';
-  if (typeof obj === 'string') return obj;
-  const l = lang || LANG;
-  return (obj[l] || obj[l === 'ar' ? 'en' : 'ar'] || '').trim();
+function pick(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v.trim();
+  return String(v.en || '').trim();
 }
-const looksArabic = s => /[؀-ۿ]/.test(s || '');
 const teamName = team => team ? team.name : '';
 const ROWS = 5;
 const STRICT_WINDOW = 50;
@@ -900,7 +995,7 @@ function selectGame(rules, ctx) {
   const taken = new Set();
   let final = null;
   if (rules.final) {
-    const deep = cands.filter(x => tierCounts(bank.byCat[x.id])[4] >= 1);
+    const deep = cands.filter(x => (bank.byCat[x.id] || []).some(q => q.tier === 5 && q.type === 'text'));
     const [fc] = pickCategories(deep.length ? deep : cands, 1, {
       rand,
       catSeen: ctx.catSeen,
@@ -956,7 +1051,7 @@ function selectGame(rules, ctx) {
     });
   }
   if (final) {
-    const pool = bank.byCat[final.cat.id] || [];
+    const pool = (bank.byCat[final.cat.id] || []).filter(q => q.type === 'text');
     const r = pickClue(pool, 5, c).q || pickClue(pool, 4, c).q || pickClue(pool, 3, c).q;
     if (r) final.q = r;else {
       final = null;
@@ -984,14 +1079,15 @@ function findReplacement(g, catId, tier, ctx) {
     rand: ctx.rand || Math.random,
     strict: false
   };
-  const same = pickClue(ctx.bank.byCat[catId] || [], tier, c).q;
+  const textOnly = ctx.textOnly ? q => q.type === 'text' : () => true;
+  const same = pickClue((ctx.bank.byCat[catId] || []).filter(textOnly), tier, c).q;
   if (same) return {
     q: same,
     how: 'same'
   };
   const inGame = new Set(gameCatIds(g));
   for (const cat of shuffleWith(usableCats(ctx.bank, g.rules).filter(x => !inGame.has(x.id)), c.rand)) {
-    const q = pickClue(ctx.bank.byCat[cat.id] || [], tier, c).q;
+    const q = pickClue((ctx.bank.byCat[cat.id] || []).filter(textOnly), tier, c).q;
     if (q) return {
       q,
       how: 'other'
@@ -1210,6 +1306,46 @@ function rematch(g, ctx, now = Date.now()) {
     emoji
   })), g.rules, ctx, now);
 }
+const freshPlay = () => ({
+  state: 'idle',
+  seq: 0,
+  vol: 0.9
+});
+function mediaCmd(g, cmd, v) {
+  const key = g.phase === 'final' ? 'final' : 'current';
+  const cur = g[key];
+  if (!cur) return g;
+  const p = {
+    ...freshPlay(),
+    ...(cur.play || {})
+  };
+  if (cmd === 'play') p.state = 'playing';else if (cmd === 'pause') p.state = 'paused';else if (cmd === 'replay') {
+    p.state = 'playing';
+    p.seq = (p.seq || 0) + 1;
+  } else if (cmd === 'stop') p.state = 'idle';else if (cmd === 'vol') p.vol = clamp(+v || 0, 0, 1);else return g;
+  return {
+    ...g,
+    [key]: {
+      ...cur,
+      play: p
+    }
+  };
+}
+function quietMedia(g) {
+  if (!g) return g;
+  const calm = c => c && c.play && c.play.state === 'playing' ? {
+    ...c,
+    play: {
+      ...c.play,
+      state: 'paused'
+    }
+  } : c;
+  return {
+    ...g,
+    current: calm(g.current),
+    final: calm(g.final)
+  };
+}
 const curCell = g => g.current ? cellById(g, g.current.cell) : null;
 const curValue = g => {
   const c = curCell(g);
@@ -1232,7 +1368,8 @@ function openCell(g, cellId, now = Date.now()) {
     result: null,
     endsAt: null,
     pausedLeft: null,
-    opener: g.picker
+    opener: g.picker,
+    play: freshPlay()
   };
   const current = c.wager ? {
     ...base,
@@ -1622,7 +1759,8 @@ function showFinalClue(g, now = Date.now()) {
       ...f,
       stage: 'clue',
       endsAt: now + ms(g.rules.finalTime * 1000),
-      pausedLeft: null
+      pausedLeft: null,
+      play: freshPlay()
     }
   };
 }
@@ -1792,7 +1930,8 @@ function invalidateClue(g, where, opts) {
         order: [],
         stage: replay ? 'clue' : f.stage,
         endsAt: replay ? now + ms(g.rules.finalTime * 1000) : null,
-        pausedLeft: null
+        pausedLeft: null,
+        play: freshPlay()
       }
     };
     return n;
@@ -1863,7 +2002,8 @@ function invalidateClue(g, where, opts) {
         changes: [],
         result: null,
         endsAt: g.rules.answerClock ? now + ms(g.rules.answerTime * 1000) : null,
-        pausedLeft: null
+        pausedLeft: null,
+        play: freshPlay()
       } : {
         ...cur,
         stage: cur.wager ? 'wager' : 'open',
@@ -1872,7 +2012,8 @@ function invalidateClue(g, where, opts) {
         changes: [],
         result: null,
         endsAt: null,
-        pausedLeft: null
+        pausedLeft: null,
+        play: freshPlay()
       }
     };else n = {
       ...n,
@@ -1999,7 +2140,7 @@ function Confirm({
     }
   }, yes || t('confirm'))));
 }
-const backArrow = () => LANG === 'ar' ? '→' : '←';
+const backArrow = () => '←';
 function TopBar({
   onBack,
   left,
@@ -2085,42 +2226,17 @@ function Toast({
     onClick: onClose
   }, t('dismiss')));
 }
-function LangButton({
-  settings,
-  setSettings
-}) {
-  return React.createElement("button", {
-    className: "pillbtn langbtn",
-    onClick: () => setSettings({
-      ...settings,
-      lang: settings.lang === 'ar' ? 'en' : 'ar'
-    }),
-    "aria-label": t('langSwitchLabel'),
-    lang: LANG === 'ar' ? 'en' : 'ar'
-  }, t('langSwitch'));
-}
-const QLangCtx = React.createContext('auto');
 function Txt({
   v,
   as = 'span',
-  className,
-  both
+  className
 }) {
-  const qLang = React.useContext(QLangCtx);
   const Tag = as;
-  const main = pick(v, LANG);
-  const other = LANG === 'ar' ? 'en' : 'ar';
-  const showOther = (both || qLang === 'both') && v && typeof v === 'object' && v[other] && v[other].trim() && v[other].trim() !== main;
   return React.createElement(Tag, {
     className: className
   }, React.createElement("span", {
-    dir: "auto",
-    lang: looksArabic(main) ? 'ar' : 'en'
-  }, main), showOther && React.createElement("span", {
-    className: "alt",
-    dir: "auto",
-    lang: other
-  }, v[other].trim()));
+    dir: "auto"
+  }, pick(v)));
 }
 const Name = ({
   team
@@ -2320,12 +2436,8 @@ function Logo() {
   return React.createElement("h1", {
     className: "logo"
   }, React.createElement("span", {
-    className: "en",
-    lang: "en"
-  }, APP_NAME.en), APP_NAME.ar && React.createElement("span", {
-    className: "ar",
-    lang: "ar"
-  }, APP_NAME.ar));
+    className: "en"
+  }, APP_NAME));
 }
 function Home({
   game,
@@ -2336,6 +2448,7 @@ function Home({
   onContinue,
   onHow,
   onSettings,
+  onClues,
   bank
 }) {
   const p = usePwa();
@@ -2348,9 +2461,8 @@ function Home({
     className: "app"
   }, React.createElement("div", {
     className: "topbar"
-  }, React.createElement(LangButton, {
-    settings: settings,
-    setSettings: setSettings
+  }, React.createElement("span", {
+    className: "iconspace"
   }), React.createElement("div", {
     className: "title"
   }), React.createElement("button", {
@@ -2388,7 +2500,10 @@ function Home({
   }, live.teams.map(tm => teamName(tm)).join(' · '), " \u2014 ", where))), React.createElement("button", {
     className: "btn btn-gold",
     onClick: onNew
-  }, t('newGame')), React.createElement("div", {
+  }, t('newGame')), onClues && React.createElement("button", {
+    className: "btn",
+    onClick: onClues
+  }, "\u270F\uFE0F ", t('myClues')), React.createElement("div", {
     className: "row"
   }, React.createElement("button", {
     className: "btn grow",
@@ -2430,7 +2545,7 @@ function Home({
 function HowTo({
   onClose
 }) {
-  const lines = LANG === 'ar' ? S.howBody[1] : S.howBody[0];
+  const lines = S.howBody;
   return React.createElement(Sheet, {
     onClose: onClose
   }, React.createElement("div", {
@@ -2854,32 +2969,32 @@ function useNow(active, every = 200) {
   return now;
 }
 const UNDO_TXT = {
-  open: ['opening the clue', 'فتح التلميح'],
-  wager: ['the Risk It wager', 'رهان «خاطِر»'],
-  buzz: ['who buzzed', 'من ضغط أولاً'],
-  right: ['“right”', '«صح»'],
-  wrong: ['“wrong”', '«غلط»'],
-  nobody: ['“nobody”', '«ولا أحد»'],
-  skip: ['the skip', 'التخطي'],
-  putBack: ['putting it back', 'إرجاع التلميح'],
-  next: ['back to the board', 'الرجوع للوحة'],
-  endRound: ['ending the round', 'إنهاء الجولة'],
-  nextStage: ['starting the next part', 'بدء المرحلة التالية'],
-  end: ['ending the game', 'إنهاء اللعبة'],
-  adjust: ['the score fix', 'تعديل النقاط'],
-  finalWagers: ['starting the wagers', 'بدء الرهانات'],
-  finalWager: ['a final wager', 'رهان أخير'],
-  finalWagerClear: ['clearing a wager', 'مسح رهان'],
-  finalClue: ['showing the final clue', 'عرض التلميح الأخير'],
-  finalJudge: ['starting the judging', 'بدء التحكيم'],
-  finalJudged: ['the last judgement', 'آخر حكم'],
-  finish: ['finishing the game', 'إنهاء اللعبة'],
-  invalid: ['“This is wrong”', '«هذا غلط»']
+  open: 'opening the clue',
+  wager: 'the Risk It wager',
+  buzz: 'who buzzed',
+  right: '“right”',
+  wrong: '“wrong”',
+  nobody: '“nobody”',
+  skip: 'the skip',
+  putBack: 'putting it back',
+  next: 'back to the board',
+  endRound: 'ending the round',
+  nextStage: 'starting the next part',
+  end: 'ending the game',
+  adjust: 'the score fix',
+  finalWagers: 'starting the wagers',
+  finalWager: 'a final wager',
+  finalWagerClear: 'clearing a wager',
+  finalClue: 'showing the final clue',
+  finalJudge: 'starting the judging',
+  finalJudged: 'the last judgement',
+  finish: 'finishing the game',
+  invalid: '“This is wrong”'
 };
 const undoText = g => {
   const l = undoLabel(g);
   return l ? t('undoWhat', {
-    what: (UNDO_TXT[l] || [l, l])[LANG === 'ar' ? 1 : 0]
+    what: UNDO_TXT[l] || l
   }) : t('nothingToUndo');
 };
 function Tile({
@@ -3019,17 +3134,26 @@ function Clock({
     }
   })));
 }
-const altList = q => q && q.alt ? [...(q.alt[LANG] || []), ...(q.alt[LANG === 'ar' ? 'en' : 'ar'] || [])] : [];
+const altList = q => q && q.alt ? Array.isArray(q.alt) ? q.alt : q.alt.en || [] : [];
 function ClueCard({
   q,
   big,
   showAnswer,
   host,
-  questionForm
+  questionForm,
+  media
 }) {
+  const md = media || {};
   return React.createElement("div", {
-    className: 'qcard' + (big ? ' big' : '')
-  }, React.createElement(Txt, {
+    className: 'qcard' + (big ? ' big' : '') + (q.media ? ' hasmedia m-' + q.media.type : '')
+  }, q.media && React.createElement(MediaView, {
+    q: q,
+    big: big,
+    play: md.play,
+    output: !!md.output,
+    onStatus: md.onStatus,
+    status: md.status
+  }), React.createElement(Txt, {
     v: q.q,
     as: "p",
     className: "qtext"
@@ -3042,8 +3166,7 @@ function ClueCard({
   }, t('response')), React.createElement(Txt, {
     v: q.a,
     as: "p",
-    className: "atext",
-    both: true
+    className: "atext"
   }), host && altList(q).length > 0 && React.createElement("p", {
     className: "aalt"
   }, React.createElement("b", null, t('alsoAccept')), " ", React.createElement("bdi", {
@@ -3073,7 +3196,9 @@ function ClueHead({
     className: "qh-cat"
   }, cat.emoji, " ", React.createElement(Txt, {
     v: cat.name
-  })), risk ? React.createElement("span", {
+  }), cell.q && cell.q.media && React.createElement("span", {
+    className: "qh-type"
+  }, MEDIA_ICON[cell.q.media.type], " ", t('type_' + cell.q.media.type))), risk ? React.createElement("span", {
     className: "qh-val risk num"
   }, t('riskIt'), cur.bet != null ? ' · ' + cur.bet : '') : React.createElement("span", {
     className: "qh-val num",
@@ -3214,8 +3339,10 @@ function ClueScreen({
   onWrong,
   onFix,
   settings,
-  setSettings
+  setSettings,
+  media
 }) {
+  const md = media || {};
   const cur = g.current;
   const cell = curCell(g);
   const peek = settings.hostPeek !== false;
@@ -3283,7 +3410,19 @@ function ClueScreen({
     q: cell.q,
     host: true,
     showAnswer: reveal || peek,
-    questionForm: g.rules.questionForm
+    questionForm: g.rules.questionForm,
+    media: {
+      play: cur.play,
+      output: md.output,
+      onStatus: md.onStatus,
+      status: md.status
+    }
+  }), React.createElement(MediaControls, {
+    q: cell.q,
+    play: cur.play,
+    act: act,
+    status: md.status,
+    where: md.where
   }), !reveal && React.createElement("button", {
     className: "btn btn-ghost btn-sm peek",
     "aria-pressed": peek,
@@ -3882,8 +4021,10 @@ function FinalScreen({
   onWrong,
   onFix,
   settings,
-  setSettings
+  setSettings,
+  media
 }) {
+  const md = media || {};
   const f = g.final;
   const [passing, setPassing] = useState(null);
   const [clearAsk, setClearAsk] = useState(null);
@@ -3962,7 +4103,19 @@ function FinalScreen({
     q: f.q,
     host: true,
     showAnswer: peek,
-    questionForm: g.rules.questionForm
+    questionForm: g.rules.questionForm,
+    media: {
+      play: f.play,
+      output: md.output,
+      onStatus: md.onStatus,
+      status: md.status
+    }
+  }), React.createElement(MediaControls, {
+    q: f.q,
+    play: f.play,
+    act: act,
+    status: md.status,
+    where: md.where
   }), React.createElement("button", {
     className: "btn btn-ghost btn-sm peek",
     "aria-pressed": peek,
@@ -4059,8 +4212,10 @@ function JudgeList({
   }));
 }
 function FinalTv({
-  g
+  g,
+  media
 }) {
+  const md = media || {};
   const f = g.final;
   return React.createElement(React.Fragment, null, React.createElement(ScoreBar, {
     g: g,
@@ -4081,7 +4236,11 @@ function FinalTv({
   }), React.createElement(ClueCard, {
     q: f.q,
     big: true,
-    questionForm: g.rules.questionForm
+    questionForm: g.rules.questionForm,
+    media: {
+      play: f.play,
+      ...md
+    }
   })), (f.stage === 'judge' || f.stage === 'done') && React.createElement(React.Fragment, null, f.q && React.createElement(ClueCard, {
     q: f.q,
     big: true,
@@ -4115,7 +4274,10 @@ function WrongSheet({
     const canRep = isFinal || canReplaceCell(g, where);
     return {
       refunds: invalidRefunds(g, where),
-      rep: canRep ? findReplacement(g, catId, tier, c) : null,
+      rep: canRep ? findReplacement(g, catId, tier, isFinal ? {
+        ...c,
+        textOnly: true
+      } : c) : null,
       canRep
     };
   }, [where, qid]);
@@ -4331,6 +4493,8 @@ function goFullscreen() {
 const hideAnswer = q => q ? {
   id: q.id,
   q: q.q,
+  type: q.type,
+  media: q.media || null,
   a: null,
   alt: null,
   note: null,
@@ -4480,8 +4644,11 @@ function TvExit({
 function TvView({
   g,
   flash,
-  onFlashDone
+  onFlashDone,
+  media,
+  preview
 }) {
+  const md = media || {};
   let body;
   if (!g) body = React.createElement("div", {
     className: "tv-wait"
@@ -4532,7 +4699,11 @@ function TvView({
       q: cell.q,
       big: true,
       showAnswer: cur.stage === 'reveal',
-      questionForm: g.rules.questionForm
+      questionForm: g.rules.questionForm,
+      media: {
+        play: cur.play,
+        ...md
+      }
     }) : React.createElement(RiskSplash, {
       g: g,
       big: true
@@ -4543,7 +4714,8 @@ function TvView({
     g: g,
     big: true
   });else if (g.phase === 'final') body = React.createElement(FinalTv, {
-    g: g
+    g: g,
+    media: md
   });else {
     const sorted = [...g.teams].sort((a, b) => b.score - a.score);
     body = React.createElement(React.Fragment, null, React.createElement(Winner, {
@@ -4557,6 +4729,18 @@ function TvView({
       big: true
     }));
   }
+  if (preview) body = React.createElement("div", {
+    className: "tv-q"
+  }, React.createElement("span", {
+    className: "eyebrow"
+  }, t('previewOnTv')), React.createElement(ClueCard, {
+    q: preview.q,
+    big: true,
+    media: {
+      play: preview.play,
+      ...md
+    }
+  }));
   return React.createElement("div", {
     className: "tvmode"
   }, React.createElement("div", {
@@ -4578,7 +4762,8 @@ const soundAllowed = () => {
 function LocalTv() {
   const [g, setG] = useState(null);
   const [flash, setFlash] = useState(null);
-  const [, setL] = useState(0);
+  const [status, setStatus] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [unlocked, setUnlocked] = useState(soundAllowed());
   const [tvPlays, setTvPlays] = useState(true);
   const chRef = useRef(null);
@@ -4591,18 +4776,14 @@ function LocalTv() {
     chRef.current = ch;
     ch.onmessage = e => {
       const m = e.data || {};
-      if (m.type === 'game') setG(m.game);else if (m.type === 'flash') setFlash(m.info);else if (m.type === 'host-hello') ch.postMessage({
+      if (m.type === 'game') setG(m.game);else if (m.type === 'flash') setFlash(m.info);else if (m.type === 'preview') setPreview(m.preview || null);else if (m.type === 'host-hello') ch.postMessage({
         type: 'hello',
         tv: TV_ID,
         sound: soundAllowed()
       });else if (m.type === 'sound-cfg') {
         sound.setConfig(m.cfg);
         setTvPlays(m.tvPlays !== false);
-      } else if (m.type === 'sfx' && playsRef.current) sound.play(m.name, m.id);else if (m.type === 'lang') {
-        setLang(m.lang);
-        applyDocLang(m.lang);
-        setL(x => x + 1);
-      }
+      } else if (m.type === 'sfx' && playsRef.current) sound.play(m.name, m.id);
     };
     ch.postMessage({
       type: 'hello',
@@ -4633,6 +4814,20 @@ function LocalTv() {
       ch.close();
     };
   }, []);
+  const onStatus = s => {
+    setStatus(s);
+    try {
+      chRef.current && chRef.current.postMessage({
+        type: 'media-status',
+        tv: TV_ID,
+        status: s
+      });
+    } catch (e) {}
+  };
+  const key = g && (g.phase === 'final' ? 'final:' + (g.final && g.final.q && g.final.q.id) : g.current ? g.current.cell + ':' + ((curCell(g) || {}).q || {}).id : '');
+  useEffect(() => {
+    setStatus(null);
+  }, [key]);
   if (!canChannel()) return React.createElement("div", {
     className: "app"
   }, React.createElement("div", {
@@ -4643,15 +4838,25 @@ function LocalTv() {
       margin: 0
     }
   }, t('tvNoChannel'))));
+  const needsClick = !unlocked || status && status.s === 'blocked';
   return React.createElement(React.Fragment, null, React.createElement(TvView, {
     g: g,
     flash: flash,
-    onFlashDone: () => setFlash(null)
-  }), !unlocked && React.createElement("button", {
+    onFlashDone: () => setFlash(null),
+    media: {
+      output: tvPlays,
+      onStatus,
+      status
+    },
+    preview: preview
+  }), needsClick && React.createElement("button", {
     className: "soundunlock",
     onClick: () => {
       setUnlocked(true);
       sound.unlock();
+      if (status && status.s === 'blocked') onStatus({
+        s: 'ready'
+      });
       try {
         chRef.current.postMessage({
           type: 'ping',
@@ -4662,19 +4867,22 @@ function LocalTv() {
     }
   }, "\uD83D\uDD0A ", t('tvAllowSound')), React.createElement(TvExit, null));
 }
-function useTvSender(game, settings, soundState) {
+function useTvSender(game, settings, soundState, preview) {
   const ch = useRef(null);
   const latest = useRef({
     game,
     settings,
-    soundState
+    soundState,
+    preview
   });
   latest.current = {
     game,
     settings,
-    soundState
+    soundState,
+    preview
   };
   const [tvs, setTvs] = useState({});
+  const [status, setStatus] = useState(null);
   useEffect(() => {
     if (!canChannel()) return undefined;
     const c = new BroadcastChannel(TV_CHANNEL);
@@ -4683,16 +4891,16 @@ function useTvSender(game, settings, soundState) {
       const m = e.data || {};
       if (m.type === 'hello') {
         c.postMessage({
-          type: 'lang',
-          lang: latest.current.settings.lang
-        });
-        c.postMessage({
           type: 'game',
           game: tvGame(latest.current.game)
         });
         if (latest.current.soundState) c.postMessage({
           type: 'sound-cfg',
           ...latest.current.soundState
+        });
+        if (latest.current.preview) c.postMessage({
+          type: 'preview',
+          preview: latest.current.preview
         });
       }
       if ((m.type === 'hello' || m.type === 'ping') && m.tv) setTvs(x => ({
@@ -4709,6 +4917,7 @@ function useTvSender(game, settings, soundState) {
         delete n[m.tv];
         return n;
       });
+      if (m.type === 'media-status') setStatus(m.status || null);
     };
     c.postMessage({
       type: 'host-hello'
@@ -4736,10 +4945,10 @@ function useTvSender(game, settings, soundState) {
   }, [game]);
   useEffect(() => {
     if (ch.current) ch.current.postMessage({
-      type: 'lang',
-      lang: settings.lang
+      type: 'preview',
+      preview: preview || null
     });
-  }, [settings.lang]);
+  }, [preview]);
   useEffect(() => {
     if (ch.current && soundState) ch.current.postMessage({
       type: 'sound-cfg',
@@ -4764,54 +4973,1321 @@ function useTvSender(game, settings, soundState) {
     tv: {
       open: list.length > 0,
       sound: list.some(x => x.sound)
+    },
+    status,
+    setStatus
+  };
+}
+const MEDIA_ICON = {
+  image: '🖼️',
+  audio: '🔊'
+};
+function useMediaUrl(src) {
+  const [state, setState] = useState({
+    url: isLocalFile(src) ? null : src || null,
+    missing: false
+  });
+  useEffect(() => {
+    if (!isLocalFile(src)) {
+      setState({
+        url: src || null,
+        missing: !src
+      });
+      return undefined;
+    }
+    let url = null;
+    let live = true;
+    fileStore.get(src.slice(4)).then(rec => {
+      if (!live) return;
+      if (rec && rec.blob) {
+        url = URL.createObjectURL(rec.blob);
+        setState({
+          url,
+          missing: false
+        });
+      } else setState({
+        url: null,
+        missing: true
+      });
+    });
+    return () => {
+      live = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [src]);
+  return state;
+}
+function AudioPlayer({
+  media,
+  play,
+  output,
+  onStatus
+}) {
+  const ref = useRef(null);
+  const {
+    url,
+    missing
+  } = useMediaUrl(media.src);
+  const st = s => onStatus && onStatus(s);
+  useEffect(() => {
+    if (missing && output) st({
+      s: 'error',
+      msg: 'mediaMissing'
+    });
+  }, [missing, output]);
+  useEffect(() => {
+    const a = ref.current;
+    if (a) a.volume = play ? play.vol : 0.9;
+  }, [play && play.vol, url]);
+  const lastSeq = useRef(play ? play.seq : 0);
+  useEffect(() => {
+    const a = ref.current;
+    if (!a || !output || !play) return;
+    if (play.seq !== lastSeq.current) {
+      lastSeq.current = play.seq;
+      try {
+        a.currentTime = 0;
+      } catch (e) {}
+    }
+    if (play.state === 'playing') {
+      const p = a.play();
+      if (p && p.catch) p.catch(e => st(e && e.name === 'NotAllowedError' ? {
+        s: 'blocked'
+      } : {
+        s: 'error',
+        msg: 'mediaFailed'
+      }));
+    } else if (play.state === 'paused' || play.state === 'idle') {
+      a.pause();
+      if (play.state === 'idle') try {
+        a.currentTime = 0;
+      } catch (e) {}
+    }
+  }, [play && play.state, play && play.seq, output, url]);
+  if (!output) return null;
+  return url ? React.createElement("audio", {
+    ref: ref,
+    src: url,
+    preload: "auto",
+    onPlaying: () => st({
+      s: 'playing'
+    }),
+    onPause: () => st({
+      s: 'paused'
+    }),
+    onEnded: () => st({
+      s: 'ended'
+    }),
+    onCanPlay: () => st({
+      s: 'ready'
+    }),
+    onError: () => st({
+      s: 'error',
+      msg: 'mediaFailed'
+    })
+  }) : null;
+}
+function SoundBadge({
+  status,
+  big
+}) {
+  const playing = status && status.s === 'playing';
+  return React.createElement("div", {
+    className: 'soundbadge' + (playing ? ' on' : '') + (big ? ' big' : ''),
+    "aria-hidden": "true"
+  }, React.createElement("span", {
+    className: "sb-ic"
+  }, "\uD83D\uDD0A"), React.createElement("span", {
+    className: "eq"
+  }, [0, 1, 2, 3, 4].map(i => React.createElement("i", {
+    key: i,
+    style: {
+      animationDelay: i * 0.12 + 's'
+    }
+  }))));
+}
+function ImageView({
+  media,
+  big
+}) {
+  const {
+    url,
+    missing
+  } = useMediaUrl(media.src);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+  const alt = media.alt || t('pictureAlt');
+  if (missing || failed) return React.createElement("div", {
+    className: 'qimg broken' + (big ? ' big' : ''),
+    role: "img",
+    "aria-label": alt
+  }, React.createElement("span", null, "\uD83D\uDDBC\uFE0F"), React.createElement("b", null, t('mediaFailedShort')));
+  return React.createElement("div", {
+    className: 'qimg' + (big ? ' big' : '') + (media.frame === 'flag' ? ' flag' : '')
+  }, url && React.createElement("img", {
+    src: url,
+    alt: alt,
+    draggable: false,
+    onError: () => setFailed(true)
+  }));
+}
+function MediaView({
+  q,
+  play,
+  big,
+  output,
+  onStatus,
+  status
+}) {
+  const m = q && q.media;
+  if (!m) return null;
+  if (m.type === 'image') return React.createElement(ImageView, {
+    media: m,
+    big: big
+  });
+  if (m.type === 'audio') return React.createElement(React.Fragment, null, React.createElement(SoundBadge, {
+    status: status,
+    big: big
+  }), React.createElement(AudioPlayer, {
+    media: m,
+    play: play || freshPlay(),
+    output: output,
+    onStatus: onStatus
+  }));
+  return null;
+}
+const STATUS_TXT = {
+  ready: 'mReady',
+  playing: 'mPlaying',
+  paused: 'mPaused',
+  ended: 'mEnded',
+  blocked: 'mBlocked',
+  error: 'mError'
+};
+function MediaControls({
+  q,
+  play,
+  act,
+  status,
+  where
+}) {
+  if (!q || !q.media || q.media.type !== 'audio') return null;
+  const p = play || freshPlay();
+  const s = status || {};
+  const playing = p.state === 'playing' && s.s !== 'ended' && s.s !== 'error';
+  return React.createElement("div", {
+    className: "mctl"
+  }, React.createElement("div", {
+    className: "row mbtns"
+  }, playing ? React.createElement("button", {
+    className: "btn btn-sm grow",
+    onClick: () => act(x => mediaCmd(x, 'pause'))
+  }, "\u23F8 ", t('mPause')) : React.createElement("button", {
+    className: "btn btn-sm btn-gold grow",
+    onClick: () => act(x => mediaCmd(x, s.s === 'ended' ? 'replay' : 'play'))
+  }, "\u25B6 ", p.state === 'idle' ? t('mPlay') : s.s === 'ended' ? t('mReplay') : t('mResume')), React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => act(x => mediaCmd(x, 'replay'))
+  }, "\u21BA ", t('mReplay'))), React.createElement("label", {
+    className: "vol"
+  }, React.createElement("span", {
+    "aria-hidden": "true"
+  }, "\uD83D\uDD08"), React.createElement("input", {
+    type: "range",
+    min: "0",
+    max: "1",
+    step: "0.05",
+    value: p.vol,
+    "aria-label": t('mVolume'),
+    onChange: e => act(x => mediaCmd(x, 'vol', +e.target.value))
+  }), React.createElement("span", {
+    "aria-hidden": "true"
+  }, "\uD83D\uDD0A")), React.createElement("p", {
+    className: 'mstatus' + (s.s === 'error' || s.s === 'blocked' ? ' bad' : ''),
+    role: "status"
+  }, where && React.createElement("span", {
+    className: "muted"
+  }, where, " \xB7 "), p.state === 'idle' && (!s.s || s.s === 'ready') ? t('mIdle') : s.s ? t(STATUS_TXT[s.s] || 'mReady') : '', s.msg ? ' ' + t(s.msg) : ''));
+}
+const PACK_FORMAT = 1;
+const PACK_MAX_IMAGE = 8 * 1024 * 1024,
+  PACK_MAX_AUDIO = 5 * 1024 * 1024,
+  PACK_MAX_FILE = 60 * 1024 * 1024;
+const CTYPES = ['text', 'image', 'audio'];
+const ROW_VALUES = [200, 400, 600, 800, 1000];
+function packClue(p, c) {
+  return {
+    id: 'pk.' + p.id + '.' + c.id,
+    cat: c.cat,
+    tier: ROW_VALUES.indexOf(c.points) + 1,
+    points: c.points,
+    q: c.q,
+    a: c.a,
+    alt: (c.alt || []).filter(Boolean),
+    note: c.note || null,
+    ref: c.ref || null,
+    verified: null,
+    facts: [],
+    reviewed: 0,
+    check: 0,
+    asOf: null,
+    type: c.type || 'text',
+    media: c.type && c.type !== 'text' ? c.media || null : null,
+    pack: p.id
+  };
+}
+function mergePacks(raw, packs) {
+  const on = (packs || []).filter(p => p && p.enabled !== false);
+  if (!on.length) return raw;
+  const groups = [...raw.groups];
+  const cats = raw.cats.map(c => ({
+    ...c
+  }));
+  const own = [];
+  on.forEach(p => (p.categories || []).forEach(c => own.push({
+    id: c.id,
+    group: 'custom',
+    emoji: c.emoji || '📦',
+    name: c.name,
+    count: [0, 0, 0, 0, 0],
+    popular: 0,
+    nicheTopic: 0,
+    pack: p.id
+  })));
+  if (own.length) {
+    groups.push({
+      id: 'custom',
+      emoji: '📦',
+      name: 'Your packs'
+    });
+    cats.push(...own);
+  }
+  const ids = new Set(cats.map(c => c.id));
+  const clues = [...raw.clues];
+  on.forEach(p => (p.clues || []).forEach(c => {
+    if (ids.has(c.cat) && ROW_VALUES.includes(c.points) && !clueProblems(c).length) clues.push(packClue(p, c));
+  }));
+  return {
+    ...raw,
+    groups,
+    cats,
+    clues
+  };
+}
+function clueProblems(c, opts = {}) {
+  const out = [];
+  if (!ROW_VALUES.includes(c.points)) out.push('vPoints');
+  if (!c.cat) out.push('vCat');
+  const m = c.media || {};
+  if (!(c.q || '').trim() && !(c.type !== 'text' && m.src)) out.push('vClue');
+  if (!(c.a || '').trim()) out.push('vResponse');
+  if (/^\s*(what|who|where|when) (is|are|was|were)\b/i.test(c.a || '')) out.push('vResponseQuestion');
+  if (c.type === 'image' && !m.src) out.push('vNoPicture');
+  if (c.type === 'audio' && !m.src) out.push('vNoSound');
+  if (opts.mediaMissing) out.push('vMediaMissing');
+  return out;
+}
+const emptyClue = (type, cat) => ({
+  id: uid(),
+  type,
+  cat: cat || '',
+  points: 200,
+  q: '',
+  a: '',
+  alt: [],
+  note: '',
+  ref: '',
+  media: type === 'text' ? null : {
+    type,
+    src: null
+  }
+});
+const missingRows = (clues, catId) => ROW_VALUES.filter(v => !(clues || []).some(c => c.cat === catId && c.points === v && !clueProblems(c).length));
+const blobToDataUrl = blob => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(r.result);
+  r.onerror = () => rej(r.error);
+  r.readAsDataURL(blob);
+});
+function dataUrlToBlob(d) {
+  const m = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(d || '');
+  if (!m) return null;
+  const bin = m[2] ? atob(m[3]) : decodeURIComponent(m[3]);
+  const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return new Blob([u], {
+    type: m[1]
+  });
+}
+async function prepareImage(file) {
+  if (!/^image\//.test(file.type)) throw new Error('vNotImage');
+  if (file.size > PACK_MAX_IMAGE) throw new Error('vTooBig');
+  if (file.type === 'image/svg+xml' || file.type === 'image/gif' || file.size < 450 * 1024) return file;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error('vUnsupported'));
+      i.src = url;
+    });
+    const scale = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(img.naturalWidth * scale);
+    cv.height = Math.round(img.naturalHeight * scale);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    const out = await new Promise(res => cv.toBlob(res, 'image/webp', 0.86));
+    if (out && out.type === 'image/webp' && out.size < file.size) return out;
+    const jpg = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.86));
+    return jpg && jpg.size < file.size ? jpg : file;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+const packFileIds = packs => {
+  const s = new Set();
+  (packs || []).forEach(p => (p.clues || []).forEach(c => {
+    const src = c.media && c.media.src;
+    if (isLocalFile(src)) s.add(src.slice(4));
+  }));
+  return s;
+};
+async function exportPack(p) {
+  const media = {};
+  for (const c of p.clues || []) {
+    const src = c.media && c.media.src;
+    if (isLocalFile(src)) {
+      const rec = await fileStore.get(src.slice(4));
+      if (rec && rec.blob) media[src.slice(4)] = {
+        type: rec.blob.type,
+        data: await blobToDataUrl(rec.blob)
+      };
+    }
+  }
+  return {
+    app: BACKUP_APP,
+    kind: 'pack',
+    format: PACK_FORMAT,
+    exportedAt: new Date().toISOString(),
+    pack: p,
+    media
+  };
+}
+function validatePack(obj) {
+  if (!obj || obj.app !== BACKUP_APP || obj.kind !== 'pack') return {
+    ok: false,
+    error: 'pkNotPack'
+  };
+  if (typeof obj.format !== 'number' || obj.format > PACK_FORMAT) return {
+    ok: false,
+    error: 'bkNewer'
+  };
+  const p = obj.pack;
+  if (!p || typeof p.name !== 'string' || !Array.isArray(p.clues) || !Array.isArray(p.categories)) return {
+    ok: false,
+    error: 'bkDamaged'
+  };
+  const media = obj.media && typeof obj.media === 'object' ? obj.media : {};
+  if (p.categories.some(c => !c || typeof c.id !== 'string' || typeof c.name !== 'string')) return {
+    ok: false,
+    error: 'bkDamaged'
+  };
+  const catIds = new Set(p.categories.map(c => c.id));
+  let bad = 0;
+  for (const c of p.clues) {
+    if (!c || typeof c !== 'object' || typeof c.q !== 'string' || typeof c.a !== 'string' || !CTYPES.includes(c.type || 'text')) return {
+      ok: false,
+      error: 'bkDamaged'
+    };
+    if (!ROW_VALUES.includes(c.points)) return {
+      ok: false,
+      error: 'pkBadPoints'
+    };
+    if (clueProblems(c).length) bad++;
+    const src = c.media && c.media.src;
+    if (isLocalFile(src) && !media[src.slice(4)]) bad++;
+    if (src && !isLocalFile(src) && !/^media\//.test(src)) return {
+      ok: false,
+      error: 'bkDamaged'
+    };
+  }
+  for (const k of Object.keys(media)) {
+    const m = media[k];
+    if (!m || typeof m.data !== 'string' || !/^data:(image|audio)\//.test(m.data)) return {
+      ok: false,
+      error: 'bkDamaged'
+    };
+  }
+  return {
+    ok: true,
+    pack: p,
+    media,
+    summary: {
+      name: p.name,
+      clues: p.clues.length,
+      cats: p.categories.length,
+      media: Object.keys(media).length,
+      bad,
+      unknownCats: p.clues.filter(c => !catIds.has(c.cat)).length
     }
   };
 }
+async function importPack(v, packs) {
+  const p = v.pack;
+  const remap = {};
+  for (const [oldId, m] of Object.entries(v.media)) {
+    const blob = dataUrlToBlob(m.data);
+    if (blob) remap[oldId] = await fileStore.put({
+      blob,
+      size: blob.size,
+      at: Date.now()
+    });
+  }
+  const pid = uid();
+  const catMap = {};
+  const categories = p.categories.map(c => {
+    const id = 'pk-' + pid + '-' + uid().slice(0, 5);
+    catMap[c.id] = id;
+    return {
+      id,
+      emoji: c.emoji || '📦',
+      name: String(c.name).slice(0, 40)
+    };
+  });
+  const clues = p.clues.map(c => {
+    const media = c.media ? {
+      ...c.media
+    } : null;
+    if (media && isLocalFile(media.src)) media.src = remap[media.src.slice(4)] ? 'idb:' + remap[media.src.slice(4)] : null;
+    return {
+      ...c,
+      id: uid(),
+      cat: catMap[c.cat] || c.cat,
+      media
+    };
+  });
+  let name = p.name || 'Pack';
+  const names = new Set((packs || []).map(x => x.name));
+  if (names.has(name)) {
+    let k = 2;
+    while (names.has(name + ' (' + k + ')')) k++;
+    name = name + ' (' + k + ')';
+  }
+  return {
+    id: pid,
+    name,
+    enabled: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    categories,
+    clues
+  };
+}
+function CluesScreen({
+  packs,
+  setPacks,
+  bank,
+  onBack,
+  tvOpen,
+  setPreview,
+  cleanUp
+}) {
+  const [openId, setOpenId] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [ask, setAsk] = useState(null);
+  const fileRef = useRef(null);
+  useEffect(() => () => setPreview(null), []);
+  const pack = packs.find(p => p.id === openId);
+  const savePack = p => setPacks(packs.map(x => x.id === p.id ? {
+    ...p,
+    updatedAt: Date.now()
+  } : x));
+  const newPack = () => {
+    const p = {
+      id: uid(),
+      name: t('newPackName', {
+        n: packs.length + 1
+      }),
+      enabled: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      categories: [],
+      clues: []
+    };
+    setPacks([...packs, p]);
+    setOpenId(p.id);
+  };
+  const readFile = file => {
+    if (!file) return;
+    if (file.size > PACK_MAX_FILE) {
+      setMsg({
+        text: t('vTooBigPack')
+      });
+      return;
+    }
+    const r = new FileReader();
+    r.onerror = () => setMsg({
+      text: t('bkUnreadable')
+    });
+    r.onload = () => {
+      let obj;
+      try {
+        obj = JSON.parse(r.result);
+      } catch (e) {
+        setMsg({
+          text: t('bkUnreadable')
+        });
+        return;
+      }
+      const v = validatePack(obj);
+      if (!v.ok) {
+        setMsg({
+          text: t(v.error)
+        });
+        return;
+      }
+      setAsk({
+        kind: 'import',
+        v
+      });
+    };
+    r.readAsText(file);
+  };
+  if (pack) return React.createElement(PackScreen, {
+    pack: pack,
+    savePack: savePack,
+    bank: bank,
+    tvOpen: tvOpen,
+    setPreview: setPreview,
+    cleanUp: cleanUp,
+    onBack: () => {
+      setOpenId(null);
+      setPreview(null);
+    },
+    onDelete: () => setAsk({
+      kind: 'delete',
+      p: pack
+    }),
+    onExport: async () => {
+      const data = await exportPack(pack);
+      downloadBlob(new Blob([JSON.stringify(data)], {
+        type: 'application/json'
+      }), 'jeopardy-board-pack-' + pack.name.replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 40) + '.json');
+    },
+    extra: ask && ask.kind === 'delete' && React.createElement(Confirm, {
+      title: t('deletePackQ'),
+      body: t('deletePackBody', {
+        n: ask.p.clues.length
+      }),
+      yes: t('deleteIt'),
+      danger: true,
+      onYes: () => {
+        const rest = packs.filter(x => x.id !== ask.p.id);
+        setPacks(rest);
+        setOpenId(null);
+        cleanUp(rest);
+      },
+      onClose: () => setAsk(null)
+    })
+  });
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: t('myClues')
+  }), React.createElement("p", {
+    className: "hint"
+  }, t('myCluesSub')), packs.map(p => React.createElement("div", {
+    key: p.id,
+    className: "card packrow"
+  }, React.createElement("button", {
+    className: "pr-main",
+    onClick: () => setOpenId(p.id)
+  }, React.createElement("b", {
+    className: "grow",
+    dir: "auto"
+  }, "\uD83D\uDCE6 ", p.name), React.createElement("span", {
+    className: "small muted"
+  }, t('cluesN', {
+    n: p.clues.length
+  }), " \xB7 ", p.categories.length ? t('packCatsN', {
+    n: p.categories.length
+  }) : t('packNoCats'))), React.createElement(Toggle, {
+    on: p.enabled !== false,
+    onChange: v => setPacks(packs.map(x => x.id === p.id ? {
+      ...x,
+      enabled: v
+    } : x)),
+    title: t('packInGames')
+  }))), !packs.length && React.createElement("p", {
+    className: "hint center"
+  }, t('noPacks')), React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: newPack
+  }, "\uFF0B ", t('newPack')), React.createElement("button", {
+    className: "btn",
+    onClick: () => fileRef.current && fileRef.current.click()
+  }, "\u2B06 ", t('importPack')), React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: "application/json,.json",
+    hidden: true,
+    onChange: e => {
+      readFile(e.target.files[0]);
+      e.target.value = '';
+    }
+  }), React.createElement("p", {
+    className: "hint"
+  }, t('packStorageNote')), ask && ask.kind === 'import' && React.createElement(Confirm, {
+    title: t('importPackQ', {
+      name: ask.v.summary.name
+    }),
+    body: t('importPackBody', ask.v.summary) + (ask.v.summary.bad ? ' ' + t('importPackBad', {
+      n: ask.v.summary.bad
+    }) : ''),
+    yes: t('importPack'),
+    onYes: async () => {
+      try {
+        const p = await importPack(ask.v, packs);
+        setPacks([...packs, p]);
+        setMsg({
+          text: t('packImported', {
+            name: p.name
+          }),
+          ok: true
+        });
+      } catch (e) {
+        setMsg({
+          text: t(/quota/i.test(e.message) ? 'storeFull' : 'storeFail')
+        });
+      }
+    },
+    onClose: () => setAsk(null)
+  }), msg && React.createElement(Toast, {
+    msg: msg.text,
+    ok: msg.ok,
+    onClose: () => setMsg(null)
+  }));
+}
+function PackScreen({
+  pack,
+  savePack,
+  bank,
+  onBack,
+  onDelete,
+  onExport,
+  extra,
+  tvOpen,
+  setPreview,
+  cleanUp
+}) {
+  const [edit, setEdit] = useState(null);
+  const [newType, setNewType] = useState(false);
+  const [catForm, setCatForm] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [delC, setDelC] = useState(null);
+  if (edit) return React.createElement(ClueForm, {
+    initial: edit,
+    pack: pack,
+    bank: bank,
+    tvOpen: tvOpen,
+    setPreview: setPreview,
+    onCancel: () => {
+      setEdit(null);
+      setPreview(null);
+    },
+    onSave: c => {
+      const exists = pack.clues.some(x => x.id === c.id);
+      const next = {
+        ...pack,
+        clues: exists ? pack.clues.map(x => x.id === c.id ? c : x) : [...pack.clues, c]
+      };
+      savePack(next);
+      setEdit(null);
+      setPreview(null);
+      cleanUp();
+    }
+  });
+  const catName = id => {
+    const c = pack.categories.find(x => x.id === id) || bank.cats.find(x => x.id === id);
+    return c ? (c.emoji || '') + ' ' + pick(c.name) : '—';
+  };
+  const list = pack.clues.filter(c => filter === 'all' || (c.type || 'text') === filter).sort((a, b) => a.cat === b.cat ? a.points - b.points : String(a.cat).localeCompare(String(b.cat)));
+  return React.createElement("div", {
+    className: "app"
+  }, React.createElement(TopBar, {
+    onBack: onBack,
+    title: pack.name
+  }), React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('packName')), React.createElement("input", {
+    className: "input",
+    dir: "auto",
+    maxLength: 60,
+    value: pack.name,
+    onChange: e => savePack({
+      ...pack,
+      name: e.target.value
+    })
+  })), React.createElement("span", {
+    className: "label"
+  }, t('packCategories')), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, t('packCategoriesSub')), React.createElement("div", {
+    className: "stack-sm"
+  }, pack.categories.map(c => {
+    const miss = missingRows(pack.clues, c.id);
+    return React.createElement("button", {
+      key: c.id,
+      className: "optrow",
+      onClick: () => setCatForm(c)
+    }, React.createElement("span", {
+      className: "cr-em"
+    }, c.emoji), React.createElement("span", {
+      className: "grow"
+    }, React.createElement("b", {
+      dir: "auto"
+    }, c.name), React.createElement("span", {
+      className: "small muted",
+      style: {
+        display: 'block'
+      }
+    }, miss.length ? '⚠ ' + t('rowsMissing', {
+      list: miss.join(', ')
+    }) : '✓ ' + t('readyForBoard'))), React.createElement("span", {
+      className: "small muted"
+    }, t('cluesN', {
+      n: pack.clues.filter(x => x.cat === c.id).length
+    })));
+  }), React.createElement("button", {
+    className: "btn btn-sm btn-ghost",
+    onClick: () => setCatForm({
+      id: 'pk-' + pack.id + '-' + uid().slice(0, 5),
+      emoji: '📦',
+      name: '',
+      isNew: true
+    })
+  }, "\uFF0B ", t('addCategory')))), React.createElement("div", {
+    className: "fchips"
+  }, ['all', ...CTYPES].map(k => React.createElement("button", {
+    key: k,
+    className: 'fchip' + (filter === k ? ' on' : ''),
+    onClick: () => setFilter(k)
+  }, k === 'all' ? t('all') : (MEDIA_ICON[k] || '📝') + ' ' + t('type_' + k)))), list.map(c => {
+    const probs = clueProblems(c);
+    return React.createElement("div", {
+      key: c.id,
+      className: "card qrow"
+    }, React.createElement("button", {
+      className: "qr-main",
+      onClick: () => setEdit(JSON.parse(JSON.stringify(c)))
+    }, React.createElement("span", {
+      className: "qr-v num"
+    }, c.points), React.createElement("span", {
+      className: "grow"
+    }, React.createElement("span", {
+      className: "small muted"
+    }, MEDIA_ICON[c.type] || '📝', " ", catName(c.cat), probs.length ? ' · ⚠ ' + t('incomplete') : ''), React.createElement("span", {
+      className: "qr-q",
+      dir: "auto"
+    }, c.q || '—'), React.createElement("span", {
+      className: "small muted",
+      dir: "auto"
+    }, "\u2192 ", c.a))), React.createElement("button", {
+      className: "iconbtn",
+      "aria-label": t('deleteClue'),
+      onClick: () => setDelC(c)
+    }, "\uD83D\uDDD1"));
+  }), !pack.clues.length && React.createElement("p", {
+    className: "hint center"
+  }, t('noCluesYet')), newType ? React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('chooseType')), React.createElement("div", {
+    className: "typegrid"
+  }, CTYPES.map(k => React.createElement("button", {
+    key: k,
+    className: "btn",
+    onClick: () => {
+      setNewType(false);
+      setEdit(emptyClue(k, pack.categories[0] ? pack.categories[0].id : ''));
+    }
+  }, MEDIA_ICON[k] || '📝', " ", t('type_' + k)))), React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => setNewType(false)
+  }, t('cancel'))) : React.createElement("button", {
+    className: "btn btn-gold",
+    onClick: () => setNewType(true)
+  }, "\uFF0B ", t('addClue')), React.createElement("div", {
+    className: "row"
+  }, React.createElement("button", {
+    className: "btn grow",
+    onClick: onExport,
+    disabled: !pack.clues.length
+  }, "\u2B07 ", t('exportPack')), React.createElement("button", {
+    className: "btn btn-danger grow",
+    onClick: onDelete
+  }, t('deletePack'))), catForm && React.createElement(CategoryForm, {
+    c: catForm,
+    onClose: () => setCatForm(null),
+    inUse: pack.clues.filter(x => x.cat === catForm.id).length,
+    onSave: c => {
+      const {
+        isNew,
+        ...cc
+      } = c;
+      savePack({
+        ...pack,
+        categories: isNew ? [...pack.categories, cc] : pack.categories.map(x => x.id === cc.id ? cc : x)
+      });
+      setCatForm(null);
+    },
+    onDelete: () => {
+      savePack({
+        ...pack,
+        categories: pack.categories.filter(x => x.id !== catForm.id)
+      });
+      setCatForm(null);
+    }
+  }), delC && React.createElement(Confirm, {
+    title: t('deleteClueQ'),
+    body: delC.q || delC.a,
+    yes: t('deleteIt'),
+    danger: true,
+    onYes: () => {
+      const next = {
+        ...pack,
+        clues: pack.clues.filter(x => x.id !== delC.id)
+      };
+      savePack(next);
+      cleanUp();
+    },
+    onClose: () => setDelC(null)
+  }), extra);
+}
+function CategoryForm({
+  c,
+  onSave,
+  onDelete,
+  onClose,
+  inUse
+}) {
+  const [d, setD] = useState(c);
+  return React.createElement(Sheet, {
+    onClose: onClose
+  }, React.createElement("div", {
+    className: "stack-sm"
+  }, React.createElement("h2", {
+    className: "display",
+    style: {
+      fontSize: 26
+    }
+  }, c.isNew ? t('addCategory') : t('editCategory')), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('emoji')), React.createElement("input", {
+    className: "input",
+    style: {
+      maxWidth: 90,
+      fontSize: 26
+    },
+    maxLength: 4,
+    value: d.emoji,
+    onChange: e => setD({
+      ...d,
+      emoji: e.target.value
+    })
+  })), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('categoryName')), React.createElement("input", {
+    className: "input",
+    dir: "auto",
+    maxLength: 40,
+    value: d.name,
+    onChange: e => setD({
+      ...d,
+      name: e.target.value
+    })
+  })), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: !d.name.trim(),
+    onClick: () => onSave({
+      ...d,
+      name: d.name.trim()
+    })
+  }, t('save')), !c.isNew && React.createElement("button", {
+    className: "btn btn-danger",
+    disabled: inUse > 0,
+    onClick: onDelete
+  }, t('deleteCategory')), !c.isNew && inUse > 0 && React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, t('categoryInUse', {
+    n: inUse
+  })), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onClose
+  }, t('cancel'))));
+}
+function ClueForm({
+  initial,
+  pack,
+  bank,
+  onSave,
+  onCancel,
+  tvOpen,
+  setPreview
+}) {
+  const [c, setC] = useState(initial);
+  const [err, setErr] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [play, setPlay] = useState(freshPlay());
+  const [status, setStatus] = useState(null);
+  const [onTv, setOnTv] = useState(false);
+  const [audioLen, setAudioLen] = useState(null);
+  const [mediaMissing, setMediaMissing] = useState(false);
+  const [tried, setTried] = useState(false);
+  const [altText, setAltText] = useState((initial.alt || []).join(', '));
+  const fileRef = useRef(null);
+  const set = patch => setC({
+    ...c,
+    ...patch
+  });
+  useEffect(() => {
+    const s = c.media && c.media.src;
+    if (isLocalFile(s)) fileStore.get(s.slice(4)).then(r => setMediaMissing(!r));else setMediaMissing(false);
+  }, [c.media && c.media.src]);
+  useEffect(() => {
+    setStatus(null);
+    setPlay(freshPlay());
+  }, [c.media && c.media.src]);
+  const probs = clueProblems(c, {
+    mediaMissing
+  });
+  const pickFile = async file => {
+    if (!file) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      let blob = file;
+      if (c.type === 'image') blob = await prepareImage(file);else {
+        if (file.size > PACK_MAX_AUDIO) throw new Error('vTooBigAudio');
+        const len = await checkAudio(file);
+        setAudioLen(len);
+        if (len > 30) setErr('vLongSound');
+      }
+      const id = await fileStore.put({
+        blob,
+        size: blob.size,
+        at: Date.now()
+      });
+      setC(x => ({
+        ...x,
+        media: {
+          type: x.type,
+          src: 'idb:' + id
+        }
+      }));
+    } catch (e) {
+      setErr(/quota/i.test(e.message) ? 'storeFull' : e.message && S[e.message] ? e.message : 'vUnsupported');
+    }
+    setBusy(false);
+  };
+  const previewQ = {
+    ...packClue(pack, c),
+    q: c.q || '…'
+  };
+  useEffect(() => {
+    if (tvOpen && onTv) setPreview({
+      q: {
+        ...previewQ,
+        a: null,
+        alt: null,
+        note: null,
+        ref: null
+      },
+      play
+    });else setPreview(null);
+  }, [onTv, tvOpen, play, c.q, c.media && c.media.src]);
+  const cmd = k => {
+    const g = mediaCmd({
+      phase: 'clue',
+      current: {
+        play
+      }
+    }, k);
+    setPlay(g.current.play);
+  };
+  const save = () => {
+    setTried(true);
+    if (probs.length) return;
+    onSave({
+      ...c,
+      q: c.q.trim(),
+      a: c.a.trim(),
+      note: (c.note || '').trim(),
+      ref: (c.ref || '').trim(),
+      alt: altText.split(',').map(s => s.trim()).filter(Boolean)
+    });
+  };
+  return React.createElement("div", {
+    className: "app qform"
+  }, React.createElement(TopBar, {
+    onBack: onCancel,
+    title: (MEDIA_ICON[c.type] || '📝') + ' ' + t('type_' + c.type)
+  }), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('category')), React.createElement("select", {
+    className: "input",
+    value: c.cat,
+    onChange: e => set({
+      cat: e.target.value
+    })
+  }, React.createElement("option", {
+    value: ""
+  }, t('chooseCategory')), pack.categories.length > 0 && React.createElement("optgroup", {
+    label: t('thisPack')
+  }, pack.categories.map(x => React.createElement("option", {
+    key: x.id,
+    value: x.id
+  }, x.emoji, " ", x.name))), bank.groups.filter(g => g.id !== 'custom').map(g => React.createElement("optgroup", {
+    key: g.id,
+    label: g.emoji + ' ' + pick(g.name)
+  }, bank.cats.filter(x => x.group === g.id).map(x => React.createElement("option", {
+    key: x.id,
+    value: x.id
+  }, x.emoji, " ", pick(x.name))))))), React.createElement("div", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('rowLabel')), React.createElement(Seg, {
+    value: c.points,
+    options: ROW_VALUES.map(v => [v, String(v)]),
+    onChange: v => set({
+      points: v
+    }),
+    label: t('rowLabel')
+  }), React.createElement("p", {
+    className: "hint"
+  }, t('rowSub'))), c.type === 'image' && React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('picture')), React.createElement("button", {
+    className: "btn",
+    disabled: busy,
+    onClick: () => fileRef.current.click()
+  }, "\uD83D\uDDBC\uFE0F ", c.media && c.media.src ? t('replacePicture') : t('choosePicture')), React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: "image/*",
+    hidden: true,
+    onChange: e => {
+      pickFile(e.target.files[0]);
+      e.target.value = '';
+    }
+  }), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, t('pictureRights'))), c.type === 'audio' && React.createElement("div", {
+    className: "card stack-sm"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('sound')), React.createElement("button", {
+    className: "btn",
+    disabled: busy,
+    onClick: () => fileRef.current.click()
+  }, "\uD83D\uDD0A ", c.media && c.media.src ? t('replaceSound') : t('chooseSound')), React.createElement("input", {
+    ref: fileRef,
+    type: "file",
+    accept: "audio/*,.mp3,.m4a,.wav,.ogg",
+    hidden: true,
+    onChange: e => {
+      pickFile(e.target.files[0]);
+      e.target.value = '';
+    }
+  }), audioLen != null && React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, t('soundLength', {
+    s: Math.round(audioLen)
+  })), React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, t('soundRights'))), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('clueText'), c.type === 'text' ? ' *' : ''), React.createElement("textarea", {
+    className: "input",
+    dir: "auto",
+    rows: 3,
+    maxLength: 300,
+    placeholder: t('clueTextPh'),
+    value: c.q,
+    onChange: e => set({
+      q: e.target.value
+    })
+  })), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('responseText'), " *"), React.createElement("input", {
+    className: "input",
+    dir: "auto",
+    maxLength: 120,
+    placeholder: t('responseTextPh'),
+    value: c.a,
+    onChange: e => set({
+      a: e.target.value
+    })
+  })), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('alsoAcceptField')), React.createElement("input", {
+    className: "input",
+    dir: "auto",
+    maxLength: 300,
+    placeholder: t('alsoAcceptPh'),
+    value: altText,
+    onChange: e => setAltText(e.target.value)
+  })), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('noteField')), React.createElement("input", {
+    className: "input",
+    dir: "auto",
+    maxLength: 200,
+    value: c.note || '',
+    onChange: e => set({
+      note: e.target.value
+    })
+  })), React.createElement("label", {
+    className: "field"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('sourceField')), React.createElement("input", {
+    className: "input",
+    dir: "auto",
+    maxLength: 300,
+    placeholder: t('sourcePh'),
+    value: c.ref || '',
+    onChange: e => set({
+      ref: e.target.value
+    })
+  })), React.createElement("div", {
+    className: "card stack-sm preview"
+  }, React.createElement("span", {
+    className: "label"
+  }, t('previewLabel')), React.createElement(ClueCard, {
+    q: previewQ,
+    host: true,
+    showAnswer: true,
+    media: {
+      play,
+      output: !(tvOpen && onTv),
+      onStatus: setStatus,
+      status
+    }
+  }), c.type === 'audio' && c.media && c.media.src && React.createElement("div", {
+    className: "row mbtns"
+  }, React.createElement("button", {
+    className: "btn btn-sm btn-gold grow",
+    onClick: () => cmd(play.state === 'playing' ? 'pause' : 'play')
+  }, play.state === 'playing' ? '⏸ ' + t('mPause') : '▶ ' + t('mPlay')), React.createElement("button", {
+    className: "btn btn-sm",
+    onClick: () => cmd('replay')
+  }, "\u21BA ", t('mReplay'))), status && status.s && React.createElement("p", {
+    className: 'mstatus' + (status.s === 'error' ? ' bad' : '')
+  }, t(STATUS_TXT[status.s] || 'mReady'), status.msg ? ' ' + t(status.msg) : ''), tvOpen ? React.createElement("button", {
+    className: "btn btn-sm",
+    "aria-pressed": onTv,
+    onClick: () => {
+      setOnTv(!onTv);
+      setPlay(freshPlay());
+    }
+  }, "\uD83D\uDCFA ", onTv ? t('stopTvPreview') : t('previewOnTvBtn')) : React.createElement("p", {
+    className: "hint",
+    style: {
+      margin: 0
+    }
+  }, t('previewTvHint'))), tried && probs.length > 0 && React.createElement("ul", {
+    className: "verrors"
+  }, probs.map(k => React.createElement("li", {
+    key: k
+  }, t(k)))), err && React.createElement("p", {
+    className: "warn"
+  }, t(err)), busy && React.createElement("p", {
+    className: "hint"
+  }, t('working')), React.createElement("button", {
+    className: "btn btn-gold",
+    disabled: busy,
+    onClick: save
+  }, t('save')), React.createElement("button", {
+    className: "btn btn-ghost",
+    onClick: onCancel
+  }, t('cancel')));
+}
 const SFX = [{
   id: 'countdown-tick',
-  en: 'Clock ticks (last 5 s)',
-  ar: 'تكتكة الساعة (آخر ٥ ثواني)'
+  en: 'Clock ticks (last 5 s)'
 }, {
   id: 'clue-open',
-  en: 'A clue opens',
-  ar: 'فتح تلميح'
+  en: 'A clue opens'
 }, {
   id: 'correct',
   en: 'Right answer',
-  ar: 'جواب صح',
   voice: 1
 }, {
   id: 'wrong',
   en: 'Wrong answer',
-  ar: 'جواب غلط',
   voice: 1
 }, {
   id: 'risk-it',
   en: 'Risk It square found',
-  ar: 'خانة «خاطِر»',
   voice: 1
 }, {
   id: 'round-end',
-  en: 'End of a round',
-  ar: 'نهاية جولة'
+  en: 'End of a round'
 }, {
   id: 'final-category',
   en: 'Final Wager category',
-  ar: 'فئة الرهان الأخير',
   voice: 1
 }, {
   id: 'final-clue',
-  en: 'Final clue shown',
-  ar: 'عرض التلميح الأخير'
+  en: 'Final clue shown'
 }, {
   id: 'game-intro',
   en: 'Game intro',
-  ar: 'بداية اللعبة',
   voice: 1
 }, {
   id: 'winner-fanfare',
   en: 'Winner',
-  ar: 'الفائز',
   voice: 1
 }];
 const DEFAULT_SOUND = {
@@ -5194,7 +6670,7 @@ function SettingsScreen({
   const backendName = {
     indexeddb: 'IndexedDB',
     localStorage: 'localStorage',
-    memory: LANG === 'ar' ? 'الذاكرة فقط' : 'memory only'
+    memory: 'memory only'
   }[store.backend];
   return React.createElement("div", {
     className: "app"
@@ -5203,27 +6679,7 @@ function SettingsScreen({
     title: t('settings')
   }), React.createElement("section", {
     className: "card stack"
-  }, React.createElement("div", {
-    className: "field"
-  }, React.createElement("span", {
-    className: "label"
-  }, t('language')), React.createElement(Seg, {
-    value: settings.lang,
-    options: [['ar', 'العربية'], ['en', 'English']],
-    onChange: v => set('lang', v),
-    label: t('language')
-  })), React.createElement("div", {
-    className: "field"
-  }, React.createElement("span", {
-    className: "label"
-  }, t('qLang')), React.createElement(Seg, {
-    value: settings.qLang,
-    options: [['auto', t('qLangAuto')], ['both', t('qLangBoth')]],
-    onChange: v => set('qLang', v),
-    label: t('qLang')
-  }), React.createElement("p", {
-    className: "hint"
-  }, t('qLangSub'))), React.createElement(Toggle, {
+  }, React.createElement(Toggle, {
     on: settings.hostPeek !== false,
     onChange: v => set('hostPeek', v),
     title: t('hostPeek'),
@@ -5371,6 +6827,7 @@ function SettingsScreen({
     body: t('importBody', {
       past: ask.v.summary.past,
       cur: ask.v.summary.current ? t('importCur') : '',
+      packs: ask.v.summary.packs,
       date: (ask.v.summary.exportedAt || '').slice(0, 10)
     }),
     yes: t('importBackup'),
@@ -5443,7 +6900,10 @@ function SoundSettings({
           [name]: 'idb:' + id
         }
       });
-      if (isLocalFile(old)) fileStore.del(old.slice(4));
+      if (isLocalFile(old)) cleanFiles({
+        ...cfg.files,
+        [name]: 'idb:' + id
+      }).catch(() => {});
       setMsg({
         text: t('sndSaved'),
         ok: true
@@ -5464,7 +6924,7 @@ function SoundSettings({
     setCfg({
       files
     });
-    if (isLocalFile(old)) fileStore.del(old.slice(4));
+    if (isLocalFile(old)) cleanFiles(files).catch(() => {});
   };
   const SRC = {
     custom: 'sndSrcCustom',
@@ -5530,10 +6990,7 @@ function SoundSettings({
       className: "sndrow"
     }, React.createElement("span", {
       className: "grow"
-    }, React.createElement("b", null, pick({
-      en: x.en,
-      ar: x.ar
-    })), x.voice ? React.createElement("span", {
+    }, React.createElement("b", null, x.en), x.voice ? React.createElement("span", {
       className: "voicetag"
     }, "\uD83C\uDF99\uFE0F ", t('sndVoiceIdea')) : null, React.createElement("small", {
       className: 'muted src-' + src
@@ -5576,16 +7033,7 @@ function SoundSettings({
     onClose: () => setMsg(null)
   }));
 }
-const deviceLang = () => {
-  try {
-    return /^ar\b/i.test(navigator.languages && navigator.languages[0] || navigator.language || '') ? 'ar' : 'en';
-  } catch (e) {
-    return 'en';
-  }
-};
 const DEFAULT_SETTINGS = {
-  lang: deviceLang(),
-  qLang: 'auto',
   motion: 'system',
   tvZoom: 1,
   rules: null,
@@ -5594,11 +7042,6 @@ const DEFAULT_SETTINGS = {
   hostPeek: true,
   sound: DEFAULT_SOUND
 };
-function applyDocLang(lang) {
-  const el = document.documentElement;
-  el.setAttribute('lang', lang === 'en' ? 'en' : 'ar');
-  el.setAttribute('dir', lang === 'en' ? 'ltr' : 'rtl');
-}
 const SESSION_ID = Math.random().toString(36).slice(2, 8);
 const BASE_BANK = typeof window !== 'undefined' ? window.JB_BANK : null;
 function App() {
@@ -5621,7 +7064,12 @@ function App() {
   const [toast, setToast] = useState(null);
   const [wrongAt, setWrongAt] = useState(null);
   const [playedList, setPlayedList] = useState(false);
-  const BANK = useMemo(() => indexBank(BASE_BANK), []);
+  const [packs, setPacksRaw] = useState([]);
+  const setPacks = l => {
+    setPacksRaw(l);
+    store.set(K.packs, l);
+  };
+  const BANK = useMemo(() => indexBank(mergePacks(BASE_BANK, packs)), [packs]);
   const [issues, setIssuesRaw] = useState([]);
   const issuesRef = useRef(issues);
   issuesRef.current = issues;
@@ -5640,10 +7088,9 @@ function App() {
         ...DEFAULT_SETTINGS,
         ...store.get(K.settings, {})
       };
-      setLang(s.lang);
       setSettingsRaw(s);
       const cur = store.get(K.current, null);
-      if (cur && Array.isArray(cur.teams) && Array.isArray(cur.boards)) setGameRaw(cur);
+      if (cur && Array.isArray(cur.teams) && Array.isArray(cur.boards)) setGameRaw(quietMedia(cur));
       setPast(store.get(K.past, []));
       const h = store.get(K.history, null);
       if (h && h.seen) {
@@ -5654,6 +7101,8 @@ function App() {
         histRef.current = hh;
         setQhistRaw(hh);
       }
+      const pk = store.get(K.packs, []);
+      if (Array.isArray(pk)) setPacksRaw(pk);
       const iss = store.get(K.issues, []);
       if (Array.isArray(iss)) {
         issuesRef.current = iss;
@@ -5663,15 +7112,12 @@ function App() {
     });
   }, []);
   useEffect(() => {
-    setLang(settings.lang);
-    applyDocLang(settings.lang);
     document.documentElement.setAttribute('data-motion', settings.motion || 'system');
     document.documentElement.style.setProperty('--tvzoom', String(settings.tvZoom || 1));
-  }, [settings.lang, settings.motion, settings.tvZoom]);
+  }, [settings.motion, settings.tvZoom]);
   const latestSettings = useRef(settings);
   latestSettings.current = settings;
   const setSettings = s => {
-    setLang(s.lang);
     setSettingsRaw(s);
     store.set(K.settings, s);
   };
@@ -5716,12 +7162,25 @@ function App() {
     used: reportedIds()
   });
   const soundCfg = cleanSound(settings.sound);
+  const [preview, setPreview] = useState(null);
   const tvLink = useTvSender(game, settings, {
     cfg: soundCfg,
     tvPlays: true
-  });
+  }, preview);
   const sendTv = tvLink.send;
   const outputHere = !tvLink.tv.open;
+  const [localStatus, setLocalStatus] = useState(null);
+  const mediaKey = game ? game.phase === 'final' ? 'final:' + (game.final && game.final.q && game.final.q.id) : game.current ? game.current.cell + ':' + ((curCell(game) || {}).q || {}).id : '' : '';
+  useEffect(() => {
+    setLocalStatus(null);
+    tvLink.setStatus(null);
+  }, [mediaKey]);
+  const mediaProps = {
+    output: outputHere,
+    onStatus: setLocalStatus,
+    status: outputHere ? localStatus : tvLink.status,
+    where: outputHere ? t('playsHere') : t('playsOnTv')
+  };
   const outRef = useRef({
     here: outputHere,
     tv: tvLink
@@ -5756,9 +7215,7 @@ function App() {
     });
     prevCur.current = curId;
   }, [curId]);
-  if (tvRoute) return React.createElement(QLangCtx.Provider, {
-    value: settings.qLang
-  }, ready ? React.createElement(LocalTv, null) : null);
+  if (tvRoute) return ready ? React.createElement(LocalTv, null) : null;
   if (!ready) return React.createElement("div", {
     className: "boot"
   }, React.createElement("div", null, "JEOPARDY-BOARD", React.createElement("small", null, "GAME NIGHT")));
@@ -5798,10 +7255,11 @@ function App() {
       ...(d.settings || {})
     };
     setSettings(s);
-    setGame(d.current || null);
+    setGame(quietMedia(d.current || null));
     setPast(d.past || []);
     store.set(K.past, d.past || []);
     setIssues(Array.isArray(d.issues) ? d.issues : []);
+    setPacks(Array.isArray(d.packs) ? d.packs : []);
     if (d.history) setQhist({
       cats: {},
       ...d.history
@@ -5810,10 +7268,10 @@ function App() {
   const clearAll = () => {
     Object.values(K).forEach(k => store.del(k));
     setSettingsRaw(DEFAULT_SETTINGS);
-    setLang(DEFAULT_SETTINGS.lang);
     setGameRaw(null);
     setPast([]);
-    cleanFiles({}).catch(() => {});
+    setPacksRaw([]);
+    cleanFiles({}, []).catch(() => {});
     issuesRef.current = [];
     setIssuesRaw([]);
     histRef.current = emptyHistory();
@@ -5831,7 +7289,16 @@ function App() {
     });
   };
   let view;
-  if (screen === 'settings') view = React.createElement(SettingsScreen, {
+  const cleanUp = list => setTimeout(() => cleanFiles(null, list || null).catch(() => {}), 0);
+  if (screen === 'clues') view = React.createElement(CluesScreen, {
+    packs: packs,
+    setPacks: setPacks,
+    bank: BANK,
+    onBack: () => setScreen('home'),
+    tvOpen: tvLink.tv.open,
+    setPreview: setPreview,
+    cleanUp: cleanUp
+  });else if (screen === 'settings') view = React.createElement(SettingsScreen, {
     settings: settings,
     setSettings: setSettings,
     state: {
@@ -5839,7 +7306,8 @@ function App() {
       game,
       past,
       history: qhist,
-      issues
+      issues,
+      packs
     },
     issues: issues,
     onClearIssues: () => setIssues([]),
@@ -5871,12 +7339,18 @@ function App() {
       onFix: () => setSheet('fix'),
       settings,
       setSettings,
-      flash: doFlash
+      flash: doFlash,
+      media: mediaProps
     };
     if (tvHere) view = React.createElement(React.Fragment, null, React.createElement(TvView, {
       g: tvGame(game),
       flash: flash,
-      onFlashDone: () => setFlash(null)
+      onFlashDone: () => setFlash(null),
+      media: {
+        output: outputHere,
+        onStatus: setLocalStatus,
+        status: localStatus
+      }
     }), React.createElement(TvExit, {
       onExit: () => setTvHere(false)
     }));else if (game.phase === 'board') view = React.createElement(Board, common);else if (game.phase === 'clue') view = React.createElement(ClueScreen, common);else if (game.phase === 'between') view = React.createElement(Between, {
@@ -5901,12 +7375,10 @@ function App() {
     onContinue: () => setScreen('game'),
     onHow: () => setSheet('how'),
     onSettings: () => setScreen('settings'),
+    onClues: () => setScreen('clues'),
     bank: BANK
   });
-  return React.createElement(QLangCtx.Provider, {
-    value: settings.qLang
-  }, React.createElement("div", {
-    key: settings.lang,
+  return React.createElement(React.Fragment, null, React.createElement("div", {
     className: "langroot"
   }, view, flash && !tvHere && screen === 'game' && React.createElement(Flash, {
     f: flash,
@@ -6032,10 +7504,22 @@ if (window.__JB_TEST__) window.__JB = {
   addIssue,
   issueEntry,
   t,
-  setLang,
   pick,
   S,
-  APP_NAME
+  APP_NAME,
+  mergePacks,
+  packClue,
+  clueProblems,
+  emptyClue,
+  missingRows,
+  validatePack,
+  exportPack,
+  importPack,
+  fileStore,
+  cleanFiles,
+  mediaCmd,
+  quietMedia,
+  freshPlay
 };
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Boundary, null, React.createElement(App, null)));
 })();

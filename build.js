@@ -27,7 +27,8 @@ fs.writeFileSync(path.join(__dirname, 'app.js'), '/* Jeopardy-Board ' + version 
 fs.writeFileSync(path.join(__dirname, 'bank.js'), '/* Jeopardy-Board clue bank ' + version + ' — built from src/bank/ by build.js. Edit src/bank/, not this file. */\n' + bank + '\n');
 fs.writeFileSync(path.join(__dirname, 'styles.css'), '/* Jeopardy-Board ' + version + ' — built from src/styles.css */\n' + css);
 fs.writeFileSync(path.join(__dirname, 'index.html'), fs.readFileSync(path.join(src, 'index.template.html'), 'utf8').replace(/__VERSION__/g, version));
-const mediaFiles = Object.values(soundFiles).map((f) => './' + f);
+// Built-in pictures and sounds (media/i, media/a) are cached on install so they work offline.
+const mediaFiles = Object.values(soundFiles).map((f) => './' + f).concat(['i', 'a'].flatMap((d) => { const dir = path.join(__dirname, 'media', d); return fs.existsSync(dir) ? fs.readdirSync(dir).sort().map((f) => './media/' + d + '/' + f) : []; }));
 fs.writeFileSync(path.join(__dirname, 'sw.js'), fs.readFileSync(path.join(src, 'sw.template.js'), 'utf8').replace(/__VERSION__/g, version).replace('__MEDIA__', JSON.stringify(mediaFiles)));
 fs.writeFileSync(path.join(__dirname, 'version.json'), JSON.stringify({ version, builtAt: new Date().toISOString() }) + '\n');
 console.log('Built Jeopardy-Board ' + version + ' from ' + parts.join(', ') + ' + ' + bankFiles.length + ' bank files');

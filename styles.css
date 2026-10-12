@@ -1,7 +1,6 @@
-/* Jeopardy-Board c09764e99b — built from src/styles.css */
+/* Jeopardy-Board 0fd6fb3bbe — built from src/styles.css */
 /* Jeopardy-Board — the "game night" family look (Khatfa, Draft Night): ink/purple stage, gold accents,
-   condensed headings. Jeopardy-Board's own accent is lime. Logical properties throughout so Arabic (RTL)
-   and English (LTR) both lay out correctly. Fonts are self-hosted (SIL OFL). */
+   condensed headings. Jeopardy-Board's own accent is lime. Fonts are self-hosted (SIL OFL). English only. */
 @font-face{font-family:'Anton';font-weight:400;font-display:swap;src:url(fonts/anton-latin-400-normal.woff2) format('woff2')}
 @font-face{font-family:'Barlow';font-weight:400;font-display:swap;src:url(fonts/barlow-latin-400-normal.woff2) format('woff2')}
 @font-face{font-family:'Barlow';font-weight:500;font-display:swap;src:url(fonts/barlow-latin-500-normal.woff2) format('woff2')}
@@ -11,11 +10,6 @@
 @font-face{font-family:'Barlow Semi Condensed';font-weight:600;font-display:swap;src:url(fonts/barlow-semi-condensed-latin-600-normal.woff2) format('woff2')}
 @font-face{font-family:'Barlow Semi Condensed';font-weight:700;font-display:swap;src:url(fonts/barlow-semi-condensed-latin-700-normal.woff2) format('woff2')}
 @font-face{font-family:'Barlow Semi Condensed';font-weight:800;font-display:swap;src:url(fonts/barlow-semi-condensed-latin-800-normal.woff2) format('woff2')}
-@font-face{font-family:'Cairo';font-weight:400;font-display:swap;src:url(fonts/cairo-arabic-400-normal.woff2) format('woff2')}
-@font-face{font-family:'Cairo';font-weight:600;font-display:swap;src:url(fonts/cairo-arabic-600-normal.woff2) format('woff2')}
-@font-face{font-family:'Cairo';font-weight:700;font-display:swap;src:url(fonts/cairo-arabic-700-normal.woff2) format('woff2')}
-@font-face{font-family:'Cairo';font-weight:800;font-display:swap;src:url(fonts/cairo-arabic-800-normal.woff2) format('woff2')}
-@font-face{font-family:'Cairo';font-weight:900;font-display:swap;src:url(fonts/cairo-arabic-900-normal.woff2) format('woff2')}
 
 :root{
   --ink:#0f0c21; --stage:#19153a; --panel:#221d47; --panel2:#2c2659; --line:#3d3672;
@@ -24,9 +18,9 @@
   /* Jeopardy-Board's own accent: lime (Risk It squares, the active tile, the logo) */
   --lime:#b6f23d; --lime-deep:#7fb51f; --lime-ink:#1a2b00;
   --danger:#ff5468; --ok:#35d07f; --ok-deep:#1f9a58;
-  --display:'Anton','Cairo','Impact','Arial Narrow Bold',sans-serif;
-  --cond:'Barlow Semi Condensed','Cairo','Arial Narrow',system-ui,sans-serif;
-  --body:'Barlow','Cairo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --display:'Anton','Impact','Arial Narrow Bold',sans-serif;
+  --cond:'Barlow Semi Condensed','Arial Narrow',system-ui,sans-serif;
+  --body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -48,9 +42,7 @@ button{cursor:pointer}
 
 /* type */
 .display{font-family:var(--display);font-weight:400;letter-spacing:.02em;text-transform:uppercase;line-height:.95;text-wrap:balance;margin:0}
-html[lang="ar"] .display{font-weight:900;letter-spacing:0;line-height:1.2}
 .eyebrow{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0}
-html[lang="ar"] .eyebrow,html[lang="ar"] .label{letter-spacing:0;font-size:14px}
 .muted{color:var(--muted)}
 .small{font-size:14px}
 .num{font-variant-numeric:tabular-nums}
@@ -60,7 +52,6 @@ h3{margin:0;font-family:var(--cond);font-weight:800;font-size:20px;letter-spacin
 /* top bar */
 .topbar{display:flex;align-items:center;gap:10px;min-height:48px}
 .topbar .title{flex:1;min-width:0;text-align:center;font-family:var(--cond);font-weight:800;font-size:18px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-html[lang="ar"] .topbar .title{letter-spacing:0}
 .iconbtn{width:46px;height:46px;flex:none;border-radius:14px;border:2px solid var(--line);background:var(--panel);display:grid;place-items:center;font-size:20px;font-weight:700}
 .iconspace{width:46px;flex:none}
 .pillbtn{height:46px;padding-inline:14px;border-radius:14px;border:2px solid var(--line);background:var(--panel);font-family:var(--cond);font-weight:800;font-size:16px;letter-spacing:.03em;flex:none}
@@ -70,7 +61,6 @@ html[lang="ar"] .topbar .title{letter-spacing:0}
 
 /* buttons */
 .btn{min-height:54px;padding-inline:18px;border-radius:16px;border:2px solid var(--line);background:var(--panel);font-family:var(--cond);font-weight:800;font-size:19px;letter-spacing:.04em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;transition:transform .12s,background .2s,opacity .2s}
-html[lang="ar"] .btn{letter-spacing:0;font-size:18px}
 .btn:active:not(:disabled){transform:scale(.97)}
 .btn:disabled{opacity:.35;cursor:not-allowed}
 .btn-gold{background:var(--gold);border-color:var(--gold);color:var(--gold-ink);box-shadow:0 6px 0 var(--gold-deep)}
@@ -107,7 +97,6 @@ html[lang="ar"] .btn{letter-spacing:0;font-size:18px}
 .toggle .sw::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:24px;height:24px;border-radius:50%;background:var(--text);transition:transform .2s}
 .toggle[aria-pressed="true"] .sw{background:var(--ok)}
 .toggle[aria-pressed="true"] .sw::after{transform:translateX(22px)}
-[dir="rtl"] .toggle[aria-pressed="true"] .sw::after{transform:translateX(-22px)}
 .mini{width:46px;height:46px;border-radius:12px;border:2px solid var(--line);background:var(--stage);font-weight:800;font-size:22px;flex:none;display:grid;place-items:center}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{min-height:38px;padding:6px 12px;border-radius:999px;border:2px solid var(--line);background:var(--panel);color:var(--muted);font-weight:700;font-size:14px}
@@ -116,11 +105,10 @@ html[lang="ar"] .btn{letter-spacing:0;font-size:18px}
 /* home */
 .hero{padding-block:18px 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
 .tag{display:inline-flex;align-items:center;gap:8px;background:var(--gold);color:var(--gold-ink);font-family:var(--cond);font-weight:800;font-size:17px;letter-spacing:.08em;text-transform:uppercase;padding:4px 14px;border-radius:30px;transform:rotate(-3deg);box-shadow:0 5px 0 var(--gold-deep)}
-[dir="rtl"] .tag{transform:rotate(3deg);letter-spacing:0}
 .tag i{width:9px;height:9px;border-radius:50%;background:var(--ink);display:inline-block}
 .logo{margin:0;display:flex;flex-direction:column;align-items:center;line-height:1}
 .logo .en{font-family:'Anton',sans-serif;font-weight:400;font-size:clamp(40px,13vw,66px);letter-spacing:.02em;text-transform:uppercase;color:var(--text);text-shadow:0 4px 0 #000,0 0 40px rgba(182,242,61,.25)}
-.logo .ar{font-family:'Cairo',var(--display);font-weight:900;font-size:clamp(30px,10vw,48px);color:var(--lime)}
+.logo .ar{font-family:var(--display);font-weight:900;font-size:clamp(30px,10vw,48px);color:var(--lime)}
 .tagline{margin:0;max-width:32ch;font-weight:600}
 .menu{display:flex;flex-direction:column;gap:12px}
 .rowbtn{display:flex;align-items:center;gap:12px;text-align:start;width:100%}
@@ -191,9 +179,8 @@ html[lang="ar"] .btn{letter-spacing:0;font-size:18px}
 .bc-head{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:64px;padding:5px 3px;border-radius:10px;background:var(--panel2);border-bottom:3px solid var(--gold);text-align:center}
 .bc-em{font-size:18px;line-height:1}
 .bc-name{font-family:var(--cond);font-weight:800;font-size:clamp(8.5px,2.6vw,12px);letter-spacing:-.03em;line-height:1.1;overflow-wrap:normal;word-break:normal;min-width:0;max-width:100%}
-html[lang="ar"] .bc-name{font-size:clamp(9px,2.6vw,13px);letter-spacing:-.01em}
 .bc-head{overflow:hidden}
-@media (min-width:600px){.bc-name{text-transform:uppercase}html[lang="ar"] .bc-name{text-transform:none}}
+@media (min-width:600px){.bc-name{text-transform:uppercase}}
 .tile{position:relative;display:grid;place-items:center;min-height:52px;border-radius:10px;font-family:var(--display);font-size:18px;border:2px solid transparent;padding:0}
 .tile.open{background:linear-gradient(170deg,#2f2766,#231d4e);color:var(--gold);border-color:#463e84;box-shadow:0 3px 0 #120e2b}
 .tile.open:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #120e2b}
@@ -215,7 +202,6 @@ html[lang="ar"] .bc-name{font-size:clamp(9px,2.6vw,13px);letter-spacing:-.01em}
 .qh-cat{font-family:var(--cond);font-weight:800;font-size:18px;min-width:0}
 .qh-val{font-family:var(--display);font-size:24px;color:var(--gold);padding:0 12px;border-radius:10px;background:var(--panel2);border:2px solid var(--gold);white-space:nowrap}
 .qh-val.risk{color:var(--lime-ink);background:var(--lime);border-color:var(--lime)}
-html[lang="ar"] .qh-val{font-weight:900}
 .stage{display:flex;align-items:center;gap:10px;justify-content:center;padding:8px 12px;border-radius:14px;background:color-mix(in srgb,var(--c,var(--line)) 22%,var(--stage));border:2px solid var(--c,var(--line));font-family:var(--cond);font-weight:800;font-size:19px;text-align:center}
 .stage .st-em{font-size:22px}
 .stage.s-open{--c:var(--gold)}
@@ -223,7 +209,6 @@ html[lang="ar"] .qh-val{font-weight:900}
 @keyframes stagein{from{transform:scale(.88);opacity:0}}
 .clock{display:flex;flex-direction:column;align-items:center;gap:6px}
 .ck-n{font-family:var(--display);font-size:44px;line-height:1;color:var(--text)}
-html[lang="ar"] .ck-n{font-weight:900}
 .ck-bar{width:100%;height:10px;border-radius:99px;background:var(--panel2);overflow:hidden}
 .ck-bar i{display:block;height:100%;background:var(--gold);border-radius:99px;transition:width .2s linear}
 .clock.hot .ck-n{color:var(--danger);animation:pulse .5s infinite alternate}
@@ -232,7 +217,6 @@ html[lang="ar"] .ck-n{font-weight:900}
 /* The clue card: deep ink with gold type (our own look, not a TV set) */
 .qcard{background:radial-gradient(120% 120% at 50% 0%,#2e2769,#18143a 70%);color:var(--text);border:3px solid var(--gold);border-radius:22px;padding:22px 16px;box-shadow:0 14px 40px rgba(0,0,0,.45),inset 0 0 0 4px rgba(255,200,61,.08);display:flex;flex-direction:column;gap:12px}
 .qtext{margin:0;font-family:var(--body);font-weight:700;font-size:clamp(21px,6vw,30px);line-height:1.35;text-align:center;text-wrap:balance;overflow-wrap:anywhere}
-.qtext [lang="ar"],.atext [lang="ar"]{font-family:'Cairo',var(--body);font-weight:800}
 .qtext .alt,.atext .alt,.anote .alt{display:block;margin-top:6px;font-size:.7em;font-weight:600;color:var(--muted)}
 .qform{margin:0;text-align:center;font-weight:800;color:var(--lime);font-size:15px}
 .qans{border-top:2px dashed var(--line);padding-top:10px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;animation:fadein .25s}
@@ -246,7 +230,6 @@ html[lang="ar"] .ck-n{font-weight:900}
 .result.k-right{background:var(--c);color:var(--on);border-color:var(--c)}
 .result.k-wrong{border-color:var(--danger)}
 .rs-t{font-family:var(--display);font-size:30px;line-height:1.1}
-html[lang="ar"] .rs-t{font-weight:900}
 .rs-s{font-family:var(--cond);font-weight:800;font-size:17px}
 .actions{position:sticky;bottom:0;margin-top:auto;margin-inline:-16px;padding:12px 16px calc(14px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--ink) calc(100% - 16px),transparent);display:grid;grid-template-columns:1fr 1.4fr;gap:10px;z-index:5}
 .actions .btn{min-height:62px;font-size:21px}
@@ -261,7 +244,6 @@ html[lang="ar"] .rs-t{font-weight:900}
 /* Risk It */
 .risksplash{display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 14px;border-radius:22px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--lime) 92%,#fff) 0 14px,var(--lime) 14px 28px);color:var(--lime-ink);text-align:center;box-shadow:0 6px 0 var(--lime-deep);animation:slam .5s cubic-bezier(.2,1.4,.4,1) both}
 .rk-t{font-family:var(--display);font-size:clamp(46px,14vw,72px);line-height:1}
-html[lang="ar"] .rk-t{font-family:'Cairo',var(--display);font-weight:900}
 .rk-s{font-family:var(--cond);font-weight:800;font-size:16px;text-transform:uppercase;letter-spacing:.08em}
 .rk-team{font-family:var(--cond);font-weight:800;font-size:20px;padding:2px 14px;border-radius:99px;background:var(--c);color:var(--on)}
 .risksplash.big .rk-t{font-size:clamp(80px,10vw,180px)}
@@ -293,7 +275,6 @@ html[lang="ar"] .rk-t{font-family:'Cairo',var(--display);font-weight:900}
 .flash{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:rgba(8,6,20,.9);padding:24px;text-align:center;animation:fadein .2s both}
 .flash .inner{display:flex;flex-direction:column;align-items:center;gap:8px;animation:slam .45s cubic-bezier(.2,1.4,.4,1) both}
 .flash .big{font-family:var(--display);font-size:clamp(70px,22vw,150px);line-height:1.05;text-shadow:0 6px 0 #000}
-html[lang="ar"] .flash .big{font-family:'Cairo',var(--display);font-weight:900}
 .flash.k-right .big{color:var(--ok)}
 .flash.k-wrong .big,.flash.k-none .big{color:var(--danger)}
 .flash.k-none .big{font-size:clamp(48px,14vw,96px)}
@@ -422,7 +403,57 @@ details.card summary{cursor:pointer}
 html[data-motion="reduce"] *,html[data-motion="reduce"] *::before,html[data-motion="reduce"] *::after{animation:none!important;transition:none!important}
 
 /* TV polish */
-html[lang="ar"] .rk-t{line-height:1.3}
 .tv-q .stage .st-em{font-size:clamp(22px,2.2vw,40px)}
 .tvmode .finalhead .eyebrow{font-size:clamp(13px,1.3vw,24px)}
 .tvmode .finalhead{padding:clamp(12px,1.4vw,24px)}
+
+/* picture & sound clues */
+.qcard.hasmedia{gap:12px}
+.qimg{position:relative;width:100%;max-height:44vh;aspect-ratio:4/3;border-radius:14px;overflow:hidden;background:#0b0918;display:grid;place-items:center}
+.qimg img{width:100%;height:100%;object-fit:contain;display:block}
+.qimg.flag{background:transparent;aspect-ratio:4/3}
+.qimg.flag img{filter:drop-shadow(0 4px 14px rgba(0,0,0,.5))}
+.qimg.big{max-height:56vh}
+.qimg.broken{color:var(--muted);gap:6px;padding:16px;text-align:center;aspect-ratio:auto;min-height:140px}
+.qimg.broken span{font-size:40px}
+.soundbadge{display:flex;align-items:center;justify-content:center;gap:14px;padding:14px;border-radius:14px;background:#0b0918;color:var(--lime)}
+.soundbadge .sb-ic{font-size:34px}
+.soundbadge.big .sb-ic{font-size:70px}
+.soundbadge .eq{display:flex;gap:5px;align-items:flex-end;height:34px}
+.soundbadge.big .eq{height:70px}
+.soundbadge .eq i{width:7px;height:20%;background:var(--lime);border-radius:3px}
+.soundbadge.big .eq i{width:14px}
+.soundbadge.on .eq i{animation:eq .9s ease-in-out infinite alternate}
+@keyframes eq{from{height:15%}to{height:100%}}
+html[data-motion="reduce"] .soundbadge.on .eq i{animation:none;height:70%}
+.qh-type{margin-inline-start:8px;font-size:.8em;padding:1px 8px;border-radius:99px;background:var(--panel2);color:var(--lime);white-space:nowrap}
+.mctl{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:14px;border:2px solid var(--line);background:var(--panel)}
+.mctl .mbtns{gap:8px}
+.mstatus{margin:0;font-size:14px;font-weight:600}
+.mstatus.bad{color:var(--danger)}
+@media (min-width:1000px){
+  .qcard.big.hasmedia{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:center;gap:28px}
+  .qcard.big.hasmedia .qans{grid-column:1/-1}
+  /* sized by the screen height so the picture, clue and response all fit on a TV */
+  .qcard.big .qimg.big{height:calc(100vh - 540px);min-height:240px;max-height:none;width:auto;max-width:100%;justify-self:center}
+}
+
+/* My clues */
+.packrow{display:flex;flex-direction:column;gap:8px;padding:12px}
+.pr-main,.qr-main{display:flex;flex-direction:column;align-items:flex-start;gap:2px;background:none;border:0;text-align:start;width:100%;padding:0}
+.qrow{display:flex;align-items:center;gap:8px;padding:10px 12px}
+.qr-main{flex-direction:row;align-items:center;gap:10px;flex:1;min-width:0}
+.qr-main>.grow{display:flex;flex-direction:column;min-width:0}
+.qr-v{min-width:48px;font-family:var(--display);font-size:20px;color:var(--gold)}
+.qr-q{display:block;font-weight:600;overflow-wrap:anywhere}
+.typegrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.typegrid .btn{font-size:16px;padding-inline:8px}
+textarea.input{resize:vertical;min-height:50px;font-family:inherit}
+select.input{appearance:auto}
+.verrors{margin:0;padding-inline-start:20px;color:var(--danger);font-weight:600;font-size:14px}
+.preview .qcard{margin:0}
+.fchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 4px}
+.fchips::-webkit-scrollbar{display:none}
+.fchip{flex:none;white-space:nowrap;min-height:38px;padding:6px 13px;border-radius:999px;border:2px solid var(--line);background:var(--panel);color:var(--muted);font-family:var(--cond);font-weight:800;font-size:14px;cursor:pointer}
+.fchip.on{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}
+.optrow .cr-em{font-size:22px}

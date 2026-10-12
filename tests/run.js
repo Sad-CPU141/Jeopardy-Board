@@ -268,9 +268,64 @@ const seeded = (s) => () => { s = (s * 1664525 + 1013904223) % 4294967296; retur
   ok(repeats < 20, 'clues seen in the last game rarely come back (' + repeats + ' repeats in 20 new games)');
   const strict = J.createGame(teams, { strict: true }, { bank: B, recent: seen, catSeen: {}, gameNo: 2, rand: seeded(9) }, 1);
   ok(strict.boards.flatMap((b) => b.cells).every((c) => !seen[c.q.id]), 'strict no-repeats: no recently seen clue comes back while others are left');
-  const ex = J.cleanRules({ exclude: B.cats.slice(0, 18).map((c) => c.id) });
+  const ex = J.cleanRules({ exclude: B.cats.slice(0, B.cats.length - 12).map((c) => c.id) });
   ok(J.usableCats(B, ex).length === 12 && J.catsNeeded(ex) === 13, 'setup knows when too few categories are switched on');
   ok(J.cleanRules({ values: [5, 0, 1, 2, 3] }).values.join() === '200,400,600,800,1000' && !J.valuesAscending([300, 200, 400, 500, 600]), 'bad point values fall back to the defaults; values must go up');
+
+  console.log('Picture and sound clues');
+  {
+    const media = B.cats.filter((c) => ['flags', 'shapes', 'sounds'].includes(c.id));
+    ok(media.length === 3 && media.every((c) => J.tierCounts(B.byCat[c.id]).every((n) => n === 4)), 'three built-in media categories, 4 clues per row');
+    const files = Object.values(w0Media()).flat();
+    function w0Media() { return B.cats.filter((c) => ['flags', 'shapes', 'sounds'].includes(c.id)).map((c) => B.byCat[c.id].map((q) => q.media.src)); }
+    ok(files.every((f) => fs.existsSync(path.join(root, f)) && /^media\/[ia]\/[0-9a-f]{12}\.(svg|mp3)$/.test(f)), 'every built-in picture/sound file exists, with a neutral name');
+    // force a board that contains the sound category
+    const only = J.cleanRules({ rounds: 1, final: false, exclude: B.cats.filter((c) => c.id !== 'sounds').slice(5).map((c) => c.id) });
+    let mg = J.createGame(teams, only, ctx(21), 1);
+    const sc = J.boardOf(mg).cells.find((c) => c.cat === 'sounds' && !c.wager);
+    ok(!!sc && sc.q.media.type === 'audio', 'a board can include sound clues');
+    mg = J.openCell(mg, sc.id, 1);
+    ok(mg.current.play && mg.current.play.state === 'idle', 'a sound clue opens silent (the host presses play)');
+    const tvm = J.tvGame(mg).boards[0].cells.find((c) => c.id === sc.id).q;
+    ok(tvm.media && tvm.media.src === sc.q.media.src && tvm.a === null, 'TV gets the sound file but not the response');
+    let pl = J.mediaCmd(mg, 'play');
+    ok(pl.current.play.state === 'playing' && J.mediaCmd(pl, 'replay').current.play.seq === 1 && J.mediaCmd(pl, 'pause').current.play.state === 'paused', 'play / replay / pause');
+    ok(J.quietMedia(pl).current.play.state === 'paused', 'after a reload a playing sound is paused, not restarted');
+    ok(pl.history.length === mg.history.length, 'playback isn’t an undo step');
+    let finals = 0;
+    for (let i = 0; i < 40; i++) { const gg = J.createGame(teams, {}, { bank: B, recent: {}, catSeen: {}, gameNo: 1, rand: seeded(300 + i) }, 1); if (gg.final.q.type !== 'text') finals++; }
+    ok(finals === 0, 'the final clue is always a text clue (40 games)');
+  }
+
+  console.log('My clues (packs)');
+  {
+    const cat = { id: 'pk-x-1', emoji: '🧪', name: 'Lab Facts' };
+    const mk = (v, q, a, extra) => ({ id: 'c' + v + (extra || ''), type: 'text', cat: cat.id, points: v, q, a, alt: [], note: '', ref: '', media: null });
+    const pack = { id: 'px', name: 'Test pack', enabled: true, categories: [cat], clues: [200, 400, 600, 800].map((v) => mk(v, 'Clue ' + v + ' here.', 'Answer ' + v)) };
+    ok(J.missingRows(pack.clues, cat.id).join() === '1000', 'a category reports which rows are still empty');
+    let M = J.indexBank(J.mergePacks(J.store ? w0Bank() : null, [pack]));
+    function w0Bank() { return J.BANK && J.BANK.cats ? { groups: B.groups, cats: B.cats, clues: [].concat(...Object.values(B.byCat)), errors: [] } : null; }
+    ok(M.cats.some((c) => c.id === cat.id) && !J.usableCats(M, J.cleanRules({})).some((c) => c.id === cat.id), 'an incomplete pack category isn’t used on boards');
+    pack.clues.push(mk(1000, 'Clue 1000 here.', 'Answer 1000'));
+    pack.clues.push({ ...mk(1000, '', 'x', 'b'), q: '' });
+    M = J.indexBank(J.mergePacks(w0Bank(), [pack]));
+    ok(J.usableCats(M, J.cleanRules({})).some((c) => c.id === cat.id) && M.byCat[cat.id].length === 5, 'a complete pack category can go on a board; incomplete clues are left out');
+    ok(J.clueProblems({ ...mk(200, 'x', 'What is Rome?') }).includes('vResponseQuestion'), 'a response written as a question is flagged');
+    ok(J.clueProblems({ ...mk(200, 'x', 'y'), type: 'image', media: { type: 'image', src: null } }).includes('vNoPicture'), 'a picture clue needs a picture');
+    const ex = J.cleanRules({ rounds: 1, final: false, exclude: M.cats.filter((c) => c.id !== cat.id).slice(5).map((c) => c.id) });
+    const pg = J.createGame(teams, ex, { bank: M, recent: {}, catSeen: {}, gameNo: 1, rand: seeded(8) }, 1);
+    ok(pg.boards[0].cats.some((c) => c.id === cat.id) && J.boardOf(pg).cells.filter((c) => c.cat === cat.id).every((c) => c.q && c.q.pack === 'px'), 'a game can use your own category');
+    ok(J.mergePacks(w0Bank(), [{ ...pack, enabled: false }]).cats.every((c) => c.id !== cat.id), 'a switched-off pack stays out of games');
+    const exported = await J.exportPack(pack);
+    const v = J.validatePack(JSON.parse(JSON.stringify(exported)));
+    ok(v.ok && v.summary.clues === 6 && v.summary.bad === 1, 'export → validate: a pack file round-trips (and counts incomplete clues)');
+    ok(J.validatePack({ app: 'khatfa', kind: 'pack' }).error === 'pkNotPack' && J.validatePack({ ...exported, pack: { ...pack, clues: [{ ...mk(300, 'a', 'b') }] } }).error === 'pkBadPoints', 'other files and bad values are refused');
+    ok(J.validatePack({ ...exported, pack: { ...pack, clues: [{ ...mk(200, 'a', 'b'), type: 'image', media: { type: 'image', src: 'https://example.com/x.png' } }] } }).error === 'bkDamaged', 'packs can’t point at outside web addresses');
+    const imp = await J.importPack(v, [pack]);
+    ok(imp.id !== pack.id && imp.name === 'Test pack (2)' && imp.categories[0].id !== cat.id && imp.clues.every((c) => c.cat === imp.categories[0].id), 'import makes a new pack with fresh ids');
+    const bk = J.makeBackup({ settings: {}, game: null, past: [], history: null, issues: [], packs: [pack] });
+    ok(J.validateBackup(JSON.parse(JSON.stringify(bk))).ok && JSON.parse(JSON.stringify(bk)).data.packs.length === 1, 'backups include your packs');
+  }
 
   /* ---------------- the app in a simulated browser ---------------- */
   console.log('Click-through (jsdom)');
@@ -353,10 +408,36 @@ const seeded = (s) => () => { s = (s * 1664525 + 1013904223) % 4294967296; retur
     ok(!!d.querySelector('.tvmode .board.big') && !d.querySelector('.tvmode .tile.open[disabled]') === false, 'TV mode on this screen shows the big board (read-only)');
     await click(w, btn(d, 'Back to controls'));
     ok(!!d.querySelector('.boardscreen'), 'back to the controls');
-    // Arabic
+    // English only
     await click(w, d.querySelector('[aria-label="Menu"]')); await click(w, btn(d, 'Home'));
-    await click(w, btn(d, 'العربية'));
-    ok(d.documentElement.getAttribute('dir') === 'rtl' && text(d).includes('لعبة جديدة'), 'Arabic: right-to-left with Arabic text');
+    ok(!/[\u0600-\u06FF]/.test(d.body.textContent + w.eval('JSON.stringify(window.JB_BANK.clues)')) && !btn(d, 'العربية'), 'English only: no Arabic text in the app or the clue bank, no language switch');
+  }
+
+  console.log('My clues click-through (jsdom)');
+  {
+    const { w, d, J: J6 } = await boot();
+    await click(w, btn(d, 'My clues'));
+    ok(text(d).includes('Make your own clue packs'), 'the My clues screen opens from home');
+    await click(w, btn(d, 'New pack'));
+    await click(w, btn(d, 'Add a category'));
+    await type(w, d.querySelector('.sheet input[dir="auto"]'), 'Lab Facts');
+    await click(w, [...d.querySelectorAll('.sheet button')].find((b) => b.textContent.trim() === 'Save'));
+    ok(text(d).includes('Lab Facts') && text(d).includes('needs clues for 200, 400, 600, 800, 1000'), 'a new category shows which rows it still needs');
+    for (const v of [200, 400, 600, 800, 1000]) {
+      await click(w, btn(d, 'Add a clue'));
+      await click(w, [...d.querySelectorAll('.typegrid button')].find((b) => /Text/.test(b.textContent)));
+      await click(w, [...d.querySelectorAll('.seg button')].find((b) => b.textContent.trim() === String(v)));
+      const ta = d.querySelector('textarea.input');
+      const set = Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, 'value').set; set.call(ta, 'Test clue worth ' + v + '.'); ta.dispatchEvent(new w.Event('input', { bubbles: true })); await sleep(20);
+      await type(w, d.querySelectorAll('.qform input.input')[0], 'Answer ' + v);
+      await click(w, [...d.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Save'));
+    }
+    const pk = J6.store.get(J6.K.packs);
+    ok(pk.length === 1 && pk[0].clues.length === 5 && pk[0].clues.every((c) => c.cat === pk[0].categories[0].id), 'five clues saved into the pack’s own category');
+    ok(text(d).includes('ready for the board'), 'the category is ready for the board');
+    await click(w, d.querySelector('[aria-label="Back"]')); await click(w, d.querySelector('[aria-label="Back"]'));
+    await click(w, btn(d, 'New game'));
+    ok(text(d).includes('34 categories on') || /of 34 categories/.test(text(d)), 'setup counts the new category');
   }
 
   console.log('Persistence and backup');

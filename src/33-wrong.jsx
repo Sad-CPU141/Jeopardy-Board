@@ -21,7 +21,7 @@ function WrongSheet({ g, where, ctx, act, onClose, onDone }) {
     const catId = isFinal ? g.final.cat.id : cell.cat;
     const tier = isFinal ? q.tier : cell.tier;
     const canRep = isFinal || canReplaceCell(g, where);
-    return { refunds: invalidRefunds(g, where), rep: canRep ? findReplacement(g, catId, tier, c) : null, canRep };
+    return { refunds: invalidRefunds(g, where), rep: canRep ? findReplacement(g, catId, tier, isFinal ? { ...c, textOnly: true } : c) : null, canRep };
   }, [where, qid]);
   const [useRep, setUseRep] = useState(true);
   if (!q || !plan) return null;

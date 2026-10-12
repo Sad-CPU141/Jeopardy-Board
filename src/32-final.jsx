@@ -51,7 +51,8 @@ function WagerPass({ g, teamId, act, onDone }) {
     </div>
   );
 }
-function FinalScreen({ g, act, flash, onMenu, onTv, onWrong, onFix, settings, setSettings }) {
+function FinalScreen({ g, act, flash, onMenu, onTv, onWrong, onFix, settings, setSettings, media }) {
+  const md = media || {};
   const f = g.final;
   const [passing, setPassing] = useState(null);
   const [clearAsk, setClearAsk] = useState(null);
@@ -86,7 +87,8 @@ function FinalScreen({ g, act, flash, onMenu, onTv, onWrong, onFix, settings, se
       </>}
       {f.stage === 'clue' && <>
         <Clock g={g} />
-        <ClueCard q={f.q} host showAnswer={peek} questionForm={g.rules.questionForm} />
+        <ClueCard q={f.q} host showAnswer={peek} questionForm={g.rules.questionForm} media={{ play: f.play, output: md.output, onStatus: md.onStatus, status: md.status }} />
+        <MediaControls q={f.q} play={f.play} act={act} status={md.status} where={md.where} />
         <button className="btn btn-ghost btn-sm peek" aria-pressed={peek} onClick={() => setSettings({ ...settings, hostPeek: !peek })}>👁 {peek ? t('hideResponse') : t('showResponse')}</button>
         <p className="hint center">{t('finalWriteHint')}</p>
         {onWrong && <button className="btn btn-sm btn-flag wrongbtn" onClick={() => onWrong('final')}>⚠ {t('thisIsWrong')}</button>}
@@ -129,7 +131,8 @@ function JudgeList({ g, big }) {
   );
 }
 // TV view of the final (fed tvGame: no clue before it's shown, no wager before it's judged).
-function FinalTv({ g }) {
+function FinalTv({ g, media }) {
+  const md = media || {};
   const f = g.final;
   return <>
     <ScoreBar g={g} activeId={finalNext(g)} big marks={f.stage === 'wager' ? Object.fromEntries(g.teams.map((tm) => [tm.id, f.locked && f.locked[tm.id] ? '🔒' : '…'])) : null} />
@@ -137,7 +140,7 @@ function FinalTv({ g }) {
       <FinalHead g={g} />
       {f.stage === 'category' && <p className="tv-big muted center">{t('finalTvCat')}</p>}
       {f.stage === 'wager' && <p className="tv-big muted center">{t('finalTvWagers')}</p>}
-      {f.stage === 'clue' && f.q && <><Clock g={g} big /><ClueCard q={f.q} big questionForm={g.rules.questionForm} /></>}
+      {f.stage === 'clue' && f.q && <><Clock g={g} big /><ClueCard q={f.q} big questionForm={g.rules.questionForm} media={{ play: f.play, ...md }} /></>}
       {(f.stage === 'judge' || f.stage === 'done') && <>
         {f.q && <ClueCard q={f.q} big showAnswer={f.stage === 'done'} />}
         <JudgeList g={g} big />

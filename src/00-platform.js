@@ -33,7 +33,7 @@ const reducedMotion = () => {
    An in-memory copy the UI reads synchronously. Writes go to IndexedDB,
    falling back to localStorage, then memory only. The game never waits.
    ============================================================ */
-const K = { settings: 'jb_settings_v1', current: 'jb_current_v1', past: 'jb_past_v1', history: 'jb_history_v1', issues: 'jb_issues_v1' };
+const K = { settings: 'jb_settings_v1', current: 'jb_current_v1', past: 'jb_past_v1', history: 'jb_history_v1', issues: 'jb_issues_v1', packs: 'jb_packs_v1' };
 const STORE_KEYS = Object.values(K);
 
 const store = (() => {
@@ -119,7 +119,8 @@ const store = (() => {
 })();
 
 /* ============================================================
-   FILE STORE: your own sound recordings (Settings → Sound), kept in
+   FILE STORE: your own sound recordings (Settings → Sound) and the pictures and
+   sounds in your clue packs (My clues), kept in
    their own IndexedDB database and referenced as "idb:<id>".
    (Same design as Khatfa's media store.)
    ============================================================ */
@@ -157,9 +158,12 @@ const fileStore = (() => {
   };
 })();
 const isLocalFile = (src) => typeof src === 'string' && src.startsWith('idb:');
-// Deletes stored recordings that no sound setting uses any more.
-async function cleanFiles(soundFiles) {
-  const used = new Set(Object.values(soundFiles || {}).filter(isLocalFile).map((s) => s.slice(4)));
+// Deletes stored files that nothing uses any more. It always looks at the SAVED sound settings
+// and EVERY pack, so cleaning up after one pack can never delete another pack's files.
+async function cleanFiles(soundFiles, packs) {
+  const snd = soundFiles || ((store.get(K.settings, {}) || {}).sound || {}).files || {};
+  const used = new Set(Object.values(snd).filter(isLocalFile).map((s) => s.slice(4)));
+  packFileIds(packs || store.get(K.packs, [])).forEach((id) => used.add(id));
   const keys = await fileStore.keys();
   await Promise.all((keys || []).filter((k) => !used.has(k)).map((k) => fileStore.del(k)));
 }
@@ -196,7 +200,7 @@ const BACKUP_APP = 'jeopardy-board';
 const BACKUP_FORMAT = 1;
 function makeBackup(state) {
   return { app: BACKUP_APP, format: BACKUP_FORMAT, exportedAt: new Date().toISOString(),
-    data: { settings: state.settings || {}, current: state.game || null, past: state.past || [], history: state.history || null, issues: state.issues || [] } };
+    data: { settings: state.settings || {}, current: state.game || null, past: state.past || [], history: state.history || null, issues: state.issues || [], packs: state.packs || [] } };
 }
 // Returns { ok, error (string key), data, summary }
 function validateBackup(obj) {
@@ -208,7 +212,8 @@ function validateBackup(obj) {
   if (games.some((g) => !g || !Array.isArray(g.teams) || !g.rules || !Array.isArray(g.log))) return { ok: false, error: 'bkDamaged' };
   if (d.history != null && (typeof d.history !== 'object' || typeof d.history.seen !== 'object')) return { ok: false, error: 'bkDamaged' };
   if (d.issues != null && !Array.isArray(d.issues)) return { ok: false, error: 'bkDamaged' };
-  return { ok: true, data: d, summary: { past: d.past.length, current: !!d.current, exportedAt: obj.exportedAt } };
+  if (d.packs != null && (!Array.isArray(d.packs) || d.packs.some((p) => !p || typeof p.id !== 'string' || !Array.isArray(p.clues) || !Array.isArray(p.categories)))) return { ok: false, error: 'bkDamaged' };
+  return { ok: true, data: d, summary: { past: d.past.length, current: !!d.current, packs: (d.packs || []).length, exportedAt: obj.exportedAt } };
 }
 
 /* ============================================================

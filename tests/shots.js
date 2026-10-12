@@ -1,5 +1,5 @@
 // Layout check: plays through a game in real Chromium (Playwright) and takes screenshots
-// at phone (360×780), laptop (1366×768) and TV (1920×1080) sizes, in English and Arabic.
+// at phone (360×780), laptop (1366×768) and TV (1920×1080) sizes. Also the clue editor and picture/sound clues.
 // Fails if any screen scrolls sideways or the page logs an error.
 // Run: npm run shots   (needs Playwright installed globally; serves the site on a local port)
 const path = require('path');
@@ -10,7 +10,7 @@ const { chromium } = require(require('child_process').execSync('npm root -g').to
 const root = path.join(__dirname, '..');
 const outDir = path.join(root, 'shots');
 fs.mkdirSync(outDir, { recursive: true });
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg' };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]); if (p.endsWith('/')) p += 'index.html';
   const f = path.join(root, p);
@@ -51,7 +51,7 @@ async function run(browser, base, { lang, w, h, tag, tv }) {
     // TV: set the game up on "this screen as the TV" and capture the big views.
     await page.locator('.btn-gold').first().click(); // new game
     await page.locator('.btn-gold').last().click();  // start
-    const tvOn = async () => { await page.locator('[aria-label="TV mode"], [aria-label="وضع التلفزيون"]').first().click(); await page.locator('.modal .btn-gold').click(); await page.waitForTimeout(150); };
+    const tvOn = async () => { await page.locator('[aria-label="TV mode"]').first().click(); await page.locator('.modal .btn-gold').click(); await page.waitForTimeout(150); };
     const tvOff = async () => { await page.locator('.tvbar .pillbtn').last().click(); await page.waitForTimeout(80); };
     await tvOn(); await shot('tv-board'); await tvOff();
     await tile((c) => !c.wager && c.tier === 4);
@@ -66,8 +66,8 @@ async function run(browser, base, { lang, w, h, tag, tv }) {
     await page.locator('.actions .btn-wrong').click(); await closeFlash();
     await page.locator('.actions .btn-gold').click(); await page.waitForTimeout(60);
     for (let r = 0; r < 2; r++) {
-      await page.locator('[aria-label="Menu"], [aria-label="القائمة"]').first().click();
-      await page.locator('.sheet .btn', { hasText: /End this round|أنهِ الجولة/ }).click();
+      await page.locator('[aria-label="Menu"]').first().click();
+      await page.locator('.sheet .btn', { hasText: /End this round/ }).click();
       await page.locator('.modal .btn-gold').click(); await page.waitForTimeout(80);
       if (r === 0) { await tvOn(); await shot('tv-between'); await tvOff(); }
       await page.locator('.btn-gold').first().click(); await page.waitForTimeout(80);
@@ -118,9 +118,9 @@ async function run(browser, base, { lang, w, h, tag, tv }) {
     await shot('fix-scores');
     await page.locator('.sheet .btn-gold').last().click(); await page.waitForTimeout(60);
     for (let r = 0; r < 2; r++) {
-      await page.locator('[aria-label="Menu"], [aria-label="القائمة"]').first().click(); await page.waitForTimeout(60);
+      await page.locator('[aria-label="Menu"]').first().click(); await page.waitForTimeout(60);
       if (r === 0) await shot('menu');
-      await page.locator('.sheet .btn', { hasText: /End this round|أنهِ الجولة/ }).click();
+      await page.locator('.sheet .btn', { hasText: /End this round/ }).click();
       await page.locator('.modal .btn-gold').click(); await page.waitForTimeout(80);
       if (r === 0) await shot('between');
       await page.locator('.btn-gold').first().click(); await page.waitForTimeout(80);
@@ -147,10 +147,83 @@ async function run(browser, base, { lang, w, h, tag, tv }) {
     await page.locator('.actions .btn-gold').click(); await page.waitForTimeout(100);
     await shot('results');
     await page.locator('.topbar .iconbtn').first().click(); await page.waitForTimeout(60);
-    await page.locator('[aria-label="Settings"], [aria-label="الإعدادات"]').first().click(); await page.waitForTimeout(80);
+    await page.locator('[aria-label="Settings"]').first().click(); await page.waitForTimeout(80);
     await shot('settings');
   }
   if (errors.length) fail(tag + ': page errors: ' + errors.slice(0, 3).join(' | ')); else pass(tag + ': no page errors, no sideways scrolling');
+  await ctx.close();
+}
+
+// Picture and sound clues + the clue editor. A game made only of the picture/sound categories
+// (plus a few others) is saved with the same engine the app uses, then played through the UI.
+async function media(browser, base, { w, h, tag, tv }) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1, reducedMotion: 'reduce' });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.addInitScript(() => { window.__JB_TEST__ = true; window.__JB_TEST_SPEED = 0.02; });
+  await page.goto(base); await page.waitForSelector('.hero');
+  const shot = async (name) => {
+    await page.waitForTimeout(250);
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    if (wide) fail(tag + ' ' + name + ': scrolls sideways');
+    await page.screenshot({ path: path.join(outDir, tag + '-' + name + '.png'), fullPage: !tv });
+  };
+  await page.evaluate(async () => {
+    const J = window.__JB; const B = J.BANK;
+    const keep = ['flags', 'shapes', 'sounds', 'capitals', 'space', 'music'];
+    const rules = J.cleanRules({ rounds: 1, final: false, exclude: B.cats.map((c) => c.id).filter((id) => !keep.includes(id)) });
+    let g = J.createGame([{ name: 'Falcons' }, { name: 'Leopards' }], rules, { bank: B, recent: {}, catSeen: {}, gameNo: 1, rand: Math.random }, Date.now());
+    g = { ...g, boards: g.boards.map((b) => ({ ...b, cells: b.cells.map((c) => ({ ...c, wager: 0 })) })) };
+    J.store.set(J.K.current, g); await J.store.flush();
+  });
+  await page.reload(); await page.waitForSelector('.hero');
+  await page.locator('.resume').click(); await page.waitForTimeout(150);
+  const openTile = async (cat, tier) => {
+    const g = await page.evaluate(() => window.__JB.store.get(window.__JB.K.current));
+    const b = g.boards[0]; const i = (tier - 1) * b.cats.length + b.cats.findIndex((c) => c.id === cat);
+    await page.locator('.board .tile').nth(i).click(); await page.waitForTimeout(150);
+  };
+  const tvOn = async () => { await page.locator('[aria-label="TV mode"]').first().click(); await page.locator('.modal .btn-gold').click(); await page.waitForTimeout(250); };
+  const tvOff = async () => { await page.locator('.tvbar .pillbtn').last().click(); await page.waitForTimeout(80); };
+  await openTile('flags', 3);
+  if (tv) { await tvOn(); await shot('media-flag'); await tvOff(); } else await shot('media-flag');
+  await page.locator('.actions .btn-ghost').last().click(); await page.waitForTimeout(60); // nobody
+  if (tv) {
+    await tvOn(); await shot('media-flag-reveal');
+    const fits = await page.evaluate(() => { const c = document.querySelector('.qcard'); return c ? Math.round(c.getBoundingClientRect().bottom) + '/' + window.innerHeight : 'none'; });
+    const [b, hh] = fits.split('/').map(Number);
+    if (b <= hh) pass(tag + ': picture clue with its response fits on the TV screen (' + fits + ')'); else fail(tag + ': picture clue runs off the TV screen (' + fits + ')');
+    await tvOff();
+  }
+  await page.locator('.actions .btn-gold').click(); await page.waitForTimeout(60);
+  await openTile('shapes', 2);
+  if (tv) { await tvOn(); await shot('media-shape'); await tvOff(); } else await shot('media-shape');
+  await page.locator('.actions .btn-ghost').last().click(); await page.locator('.actions .btn-gold').click(); await page.waitForTimeout(60);
+  await openTile('sounds', 1);
+  await page.locator('.mctl .btn-gold').click(); await page.waitForTimeout(400);
+  if (tv) { await tvOn(); await shot('media-sound'); await tvOff(); } else await shot('media-sound');
+  const played = await page.evaluate(() => { const a = document.querySelector('audio'); return a ? { paused: a.paused, t: a.currentTime } : null; });
+  if (!tv) { if (played && !played.paused) pass(tag + ': the sound clue plays in a real browser (audio element running)'); else fail(tag + ': sound did not start: ' + JSON.stringify(played)); }
+  if (!tv) {
+    await page.locator('[aria-label="Menu"]').click(); await page.locator('.sheet .menu2').last().click(); await page.waitForTimeout(80);
+    await page.locator('.btn', { hasText: 'My clues' }).click(); await page.waitForTimeout(80);
+    await page.locator('.btn-gold', { hasText: 'New pack' }).click(); await page.waitForTimeout(80);
+    await page.locator('.btn', { hasText: 'Add a category' }).click();
+    await page.locator('.sheet input[dir="auto"]').fill('Family Trivia'); await page.locator('.sheet .btn-gold').click(); await page.waitForTimeout(60);
+    await shot('editor-pack');
+    await page.locator('.btn-gold', { hasText: 'Add a clue' }).click(); await page.locator('.typegrid .btn', { hasText: 'Picture' }).click(); await page.waitForTimeout(80);
+    await page.locator('input[type=file]').setInputFiles(path.join(root, 'icons/icon-512.png')); await page.waitForTimeout(500);
+    await page.locator('textarea.input').fill('This is the logo of the game you are playing.'); await page.locator('.qform input.input').first().fill('Jeopardy-Board');
+    await shot('editor-clue');
+    await page.locator('.btn-gold', { hasText: 'Save' }).click(); await page.waitForTimeout(150);
+    const saved = await page.evaluate(() => { const p = window.__JB.store.get(window.__JB.K.packs); return p && p[0].clues[0] && p[0].clues[0].media && p[0].clues[0].media.src; });
+    const stored = saved ? await page.evaluate((id) => window.__JB.fileStore.get(id.slice(4)).then((r) => !!(r && r.blob)), saved) : false;
+    if (saved && stored) pass(tag + ': a picture clue saves with its file in IndexedDB'); else fail(tag + ': picture clue not saved: ' + saved);
+    await shot('editor-list');
+  }
+  if (errors.length) fail(tag + ' media: page errors: ' + errors.slice(0, 3).join(' | ')); else pass(tag + ' media: no page errors, no sideways scrolling');
   await ctx.close();
 }
 
@@ -158,11 +231,12 @@ server.listen(0, async () => {
   const base = 'http://127.0.0.1:' + server.address().port + '/';
   const browser = await chromium.launch();
   try {
-    for (const lang of ['en', 'ar']) {
-      await run(browser, base, { lang, w: 360, h: 780, tag: 'phone-' + lang });
-      await run(browser, base, { lang, w: 1366, h: 768, tag: 'laptop-' + lang });
-      await run(browser, base, { lang, w: 1920, h: 1080, tag: 'tv-' + lang, tv: true });
-    }
+    const lang = 'en';
+    await run(browser, base, { lang, w: 360, h: 780, tag: 'phone' });
+    await run(browser, base, { lang, w: 1366, h: 768, tag: 'laptop' });
+    await run(browser, base, { lang, w: 1920, h: 1080, tag: 'tv', tv: true });
+    await media(browser, base, { w: 360, h: 780, tag: 'phone' });
+    await media(browser, base, { w: 1920, h: 1080, tag: 'tv', tv: true });
   } catch (e) { fail('crashed: ' + (e.stack || e.message)); }
   await browser.close(); server.close();
   console.log(problems ? problems + ' problem(s)' : 'Screenshots in shots/');

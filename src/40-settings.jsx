@@ -20,16 +20,11 @@ function SettingsScreen({ settings, setSettings, state, onRestore, onClearAll, o
     };
     r.readAsText(file);
   };
-  const backendName = { indexeddb: 'IndexedDB', localStorage: 'localStorage', memory: LANG === 'ar' ? 'الذاكرة فقط' : 'memory only' }[store.backend];
+  const backendName = { indexeddb: 'IndexedDB', localStorage: 'localStorage', memory: 'memory only' }[store.backend];
   return (
     <div className="app">
       <TopBar onBack={onBack} title={t('settings')} />
       <section className="card stack">
-        <div className="field"><span className="label">{t('language')}</span>
-          <Seg value={settings.lang} options={[['ar', 'العربية'], ['en', 'English']]} onChange={(v) => set('lang', v)} label={t('language')} /></div>
-        <div className="field"><span className="label">{t('qLang')}</span>
-          <Seg value={settings.qLang} options={[['auto', t('qLangAuto')], ['both', t('qLangBoth')]]} onChange={(v) => set('qLang', v)} label={t('qLang')} />
-          <p className="hint">{t('qLangSub')}</p></div>
         <Toggle on={settings.hostPeek !== false} onChange={(v) => set('hostPeek', v)} title={t('hostPeek')} sub={t('hostPeekSub')} />
         <div className="field"><span className="label">{t('motion')}</span>
           <Seg value={settings.motion} options={[['system', t('motionSystem')], ['full', t('motionFull')], ['reduce', t('motionReduce')]]} onChange={(v) => set('motion', v)} label={t('motion')} /></div>
@@ -78,7 +73,7 @@ function SettingsScreen({ settings, setSettings, state, onRestore, onClearAll, o
       <details className="card"><summary className="label">{t('credits')}</summary><p className="hint">{t('creditsBody')}</p></details>
       <p className="exportfoot">{t('version', { v: APP_VERSION })}</p>
       {ask && ask.kind === 'import' && (
-        <Confirm title={t('importQ')} body={t('importBody', { past: ask.v.summary.past, cur: ask.v.summary.current ? t('importCur') : '', date: (ask.v.summary.exportedAt || '').slice(0, 10) })} yes={t('importBackup')}
+        <Confirm title={t('importQ')} body={t('importBody', { past: ask.v.summary.past, cur: ask.v.summary.current ? t('importCur') : '', packs: ask.v.summary.packs, date: (ask.v.summary.exportedAt || '').slice(0, 10) })} yes={t('importBackup')}
           onYes={() => { onRestore(ask.v.data); setMsg({ text: t('restored'), ok: true }); }} onClose={() => setAsk(null)} />
       )}
       {ask && ask.kind === 'hist' && <Confirm title={t('resetHistoryQ')} body={t('resetHistoryBody')} yes={t('resetHistory')} onYes={onResetHistory} onClose={() => setAsk(null)} />}
@@ -106,7 +101,7 @@ function SoundSettings({ settings, setSettings }) {
       const id = await fileStore.put({ blob: file, size: file.size, at: Date.now() });
       const old = cfg.files[name];
       setCfg({ files: { ...cfg.files, [name]: 'idb:' + id } });
-      if (isLocalFile(old)) fileStore.del(old.slice(4));
+      if (isLocalFile(old)) cleanFiles({ ...cfg.files, [name]: 'idb:' + id }).catch(() => {});
       setMsg({ text: t('sndSaved'), ok: true });
     } catch (e) {
       setMsg({ text: t(/quota/i.test(e.message) ? 'storeFull' : S[e.message] ? e.message : 'sndUnsupported') });
@@ -115,7 +110,7 @@ function SoundSettings({ settings, setSettings }) {
   };
   const remove = (name) => {
     const old = cfg.files[name]; const files = { ...cfg.files }; delete files[name];
-    setCfg({ files }); if (isLocalFile(old)) fileStore.del(old.slice(4));
+    setCfg({ files }); if (isLocalFile(old)) cleanFiles(files).catch(() => {});
   };
   const SRC = { custom: 'sndSrcCustom', file: 'sndSrcFile', builtin: 'sndSrcBuiltin', none: 'sndSrcNone' };
   const srcOf = (name) => (cfg.files[name] ? 'custom' : REPO_SOUNDS[name] ? 'file' : cfg.builtin ? 'builtin' : 'none');
@@ -135,7 +130,7 @@ function SoundSettings({ settings, setSettings }) {
             const src = srcOf(x.id);
             return (
               <li key={x.id} className="sndrow">
-                <span className="grow"><b>{pick({ en: x.en, ar: x.ar })}</b>{x.voice ? <span className="voicetag">🎙️ {t('sndVoiceIdea')}</span> : null}<small className={'muted src-' + src}>{t(SRC[src])}{src === 'file' ? ' (' + REPO_SOUNDS[x.id] + ')' : ''}</small></span>
+                <span className="grow"><b>{x.en}</b>{x.voice ? <span className="voicetag">🎙️ {t('sndVoiceIdea')}</span> : null}<small className={'muted src-' + src}>{t(SRC[src])}{src === 'file' ? ' (' + REPO_SOUNDS[x.id] + ')' : ''}</small></span>
                 <button className="mini" aria-label={t('sndPreview') + ': ' + x.en} disabled={src === 'none'} onClick={() => { sound.unlock(); sound.preview(x.id); }}>▶</button>
                 <button className="btn btn-sm" disabled={busy === x.id} onClick={() => { target.current = x.id; fileRef.current.click(); }}>{cfg.files[x.id] ? t('sndReplace') : t('sndUpload')}</button>
                 {cfg.files[x.id] && <button className="btn btn-sm btn-ghost" onClick={() => remove(x.id)}>{t('sndRemove')}</button>}

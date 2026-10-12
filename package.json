@@ -8,11 +8,16 @@
     "test": "node tests/run.js",
     "shots": "node tests/shots.js",
     "audit": "node tools/audit.js",
-    "icons": "node tools/icons.js"
+    "icons": "node tools/icons.js",
+    "media": "node tools/media.js"
   },
   "devDependencies": {
     "@babel/standalone": "7.24.7",
+    "d3-geo": "^3.1.1",
     "fake-indexeddb": "6.0.0",
-    "jsdom": "24.1.0"
+    "flag-icons": "^7.5.0",
+    "jsdom": "24.1.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   }
 }

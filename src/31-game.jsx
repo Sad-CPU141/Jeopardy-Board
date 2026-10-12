@@ -9,15 +9,15 @@ function useNow(active, every = 200) {
   return now;
 }
 const UNDO_TXT = {
-  open: ['opening the clue', 'فتح التلميح'], wager: ['the Risk It wager', 'رهان «خاطِر»'], buzz: ['who buzzed', 'من ضغط أولاً'],
-  right: ['“right”', '«صح»'], wrong: ['“wrong”', '«غلط»'], nobody: ['“nobody”', '«ولا أحد»'], skip: ['the skip', 'التخطي'],
-  putBack: ['putting it back', 'إرجاع التلميح'], next: ['back to the board', 'الرجوع للوحة'], endRound: ['ending the round', 'إنهاء الجولة'],
-  nextStage: ['starting the next part', 'بدء المرحلة التالية'], end: ['ending the game', 'إنهاء اللعبة'], adjust: ['the score fix', 'تعديل النقاط'],
-  finalWagers: ['starting the wagers', 'بدء الرهانات'], finalWager: ['a final wager', 'رهان أخير'], finalWagerClear: ['clearing a wager', 'مسح رهان'],
-  finalClue: ['showing the final clue', 'عرض التلميح الأخير'], finalJudge: ['starting the judging', 'بدء التحكيم'], finalJudged: ['the last judgement', 'آخر حكم'],
-  finish: ['finishing the game', 'إنهاء اللعبة'], invalid: ['“This is wrong”', '«هذا غلط»'],
+  open: 'opening the clue', wager: 'the Risk It wager', buzz: 'who buzzed',
+  right: '“right”', wrong: '“wrong”', nobody: '“nobody”', skip: 'the skip',
+  putBack: 'putting it back', next: 'back to the board', endRound: 'ending the round',
+  nextStage: 'starting the next part', end: 'ending the game', adjust: 'the score fix',
+  finalWagers: 'starting the wagers', finalWager: 'a final wager', finalWagerClear: 'clearing a wager',
+  finalClue: 'showing the final clue', finalJudge: 'starting the judging', finalJudged: 'the last judgement',
+  finish: 'finishing the game', invalid: '“This is wrong”',
 };
-const undoText = (g) => { const l = undoLabel(g); return l ? t('undoWhat', { what: (UNDO_TXT[l] || [l, l])[LANG === 'ar' ? 1 : 0] }) : t('nothingToUndo'); };
+const undoText = (g) => { const l = undoLabel(g); return l ? t('undoWhat', { what: UNDO_TXT[l] || l }) : t('nothingToUndo'); };
 
 /* ---------- board ---------- */
 function Tile({ g, cell, onOpen }) {
@@ -75,16 +75,19 @@ function Clock({ g, big }) {
     </div>
   );
 }
-const altList = (q) => (q && q.alt ? [...(q.alt[LANG] || []), ...(q.alt[LANG === 'ar' ? 'en' : 'ar'] || [])] : []);
-function ClueCard({ q, big, showAnswer, host, questionForm }) {
+const altList = (q) => (q && q.alt ? (Array.isArray(q.alt) ? q.alt : q.alt.en || []) : []);
+// media: { play, output, onStatus, status } — how this screen handles a picture/sound clue.
+function ClueCard({ q, big, showAnswer, host, questionForm, media }) {
+  const md = media || {};
   return (
-    <div className={'qcard' + (big ? ' big' : '')}>
+    <div className={'qcard' + (big ? ' big' : '') + (q.media ? ' hasmedia m-' + q.media.type : '')}>
+      {q.media && <MediaView q={q} big={big} play={md.play} output={!!md.output} onStatus={md.onStatus} status={md.status} />}
       <Txt v={q.q} as="p" className="qtext" />
       {questionForm && !showAnswer && <p className="qform">❓ {t('qFormReminder')}</p>}
       {showAnswer && q.a && (
         <div className="qans">
           <span className="eyebrow">{t('response')}</span>
-          <Txt v={q.a} as="p" className="atext" both />
+          <Txt v={q.a} as="p" className="atext" />
           {host && altList(q).length > 0 && <p className="aalt"><b>{t('alsoAccept')}</b> <bdi dir="auto">{altList(q).join(' · ')}</bdi></p>}
           {q.note && <Txt v={q.note} as="p" className="anote" />}
           {host && q.asOf && <p className="aalt">{t('asOf', { d: q.asOf })}</p>}
@@ -100,7 +103,7 @@ function ClueHead({ g, cell }) {
   const risk = cur && cur.cell === cell.id && cur.wager;
   return (
     <div className="qhead">
-      <span className="qh-cat">{cat.emoji} <Txt v={cat.name} /></span>
+      <span className="qh-cat">{cat.emoji} <Txt v={cat.name} />{cell.q && cell.q.media && <span className="qh-type">{MEDIA_ICON[cell.q.media.type]} {t('type_' + cell.q.media.type)}</span>}</span>
       {risk ? <span className="qh-val risk num">{t('riskIt')}{cur.bet != null ? ' · ' + cur.bet : ''}</span> : <span className="qh-val num" dir="ltr">{cell.value}</span>}
     </div>
   );
@@ -154,7 +157,8 @@ function RiskWager({ g, act }) {
     </div>
   );
 }
-function ClueScreen({ g, act, flash, onMenu, onTv, onWrong, onFix, settings, setSettings }) {
+function ClueScreen({ g, act, flash, onMenu, onTv, onWrong, onFix, settings, setSettings, media }) {
+  const md = media || {};
   const cur = g.current; const cell = curCell(g);
   const peek = settings.hostPeek !== false;
   const setPeek = (v) => setSettings({ ...settings, hostPeek: v });
@@ -175,7 +179,8 @@ function ClueScreen({ g, act, flash, onMenu, onTv, onWrong, onFix, settings, set
         <p className="hint center">{t('riskHidden')}</p>
       </> : <>
         <Clock g={g} />
-        <ClueCard q={cell.q} host showAnswer={reveal || peek} questionForm={g.rules.questionForm} />
+        <ClueCard q={cell.q} host showAnswer={reveal || peek} questionForm={g.rules.questionForm} media={{ play: cur.play, output: md.output, onStatus: md.onStatus, status: md.status }} />
+        <MediaControls q={cell.q} play={cur.play} act={act} status={md.status} where={md.where} />
         {!reveal && <button className="btn btn-ghost btn-sm peek" aria-pressed={peek} onClick={() => setPeek(!peek)}>👁 {peek ? t('hideResponse') : t('showResponse')}</button>}
         {!!cell.q.check && <p className="checkbadge">{t('needsCheck', { d: cell.q.asOf || '?' })}</p>}
         {reveal && <ResultBanner g={g} />}

@@ -13,16 +13,16 @@
    There is no "thinking music": the final round's clock just ticks in its last 5 seconds.
    ============================================================ */
 const SFX = [
-  { id: 'countdown-tick', en: 'Clock ticks (last 5 s)', ar: 'تكتكة الساعة (آخر ٥ ثواني)' },
-  { id: 'clue-open', en: 'A clue opens', ar: 'فتح تلميح' },
-  { id: 'correct', en: 'Right answer', ar: 'جواب صح', voice: 1 },
-  { id: 'wrong', en: 'Wrong answer', ar: 'جواب غلط', voice: 1 },
-  { id: 'risk-it', en: 'Risk It square found', ar: 'خانة «خاطِر»', voice: 1 },
-  { id: 'round-end', en: 'End of a round', ar: 'نهاية جولة' },
-  { id: 'final-category', en: 'Final Wager category', ar: 'فئة الرهان الأخير', voice: 1 },
-  { id: 'final-clue', en: 'Final clue shown', ar: 'عرض التلميح الأخير' },
-  { id: 'game-intro', en: 'Game intro', ar: 'بداية اللعبة', voice: 1 },
-  { id: 'winner-fanfare', en: 'Winner', ar: 'الفائز', voice: 1 },
+  { id: 'countdown-tick', en: 'Clock ticks (last 5 s)' },
+  { id: 'clue-open', en: 'A clue opens' },
+  { id: 'correct', en: 'Right answer', voice: 1 },
+  { id: 'wrong', en: 'Wrong answer', voice: 1 },
+  { id: 'risk-it', en: 'Risk It square found', voice: 1 },
+  { id: 'round-end', en: 'End of a round' },
+  { id: 'final-category', en: 'Final Wager category', voice: 1 },
+  { id: 'final-clue', en: 'Final clue shown' },
+  { id: 'game-intro', en: 'Game intro', voice: 1 },
+  { id: 'winner-fanfare', en: 'Winner', voice: 1 },
 ];
 const DEFAULT_SOUND = { volume: 0.8, muted: false, builtin: true, files: {} };
 const cleanSound = (s) => {

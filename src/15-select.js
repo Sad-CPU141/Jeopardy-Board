@@ -97,7 +97,8 @@ function selectGame(rules, ctx) {
   // The final category first, from the categories with the deepest hard rows, so the final clue is a real test.
   let final = null;
   if (rules.final) {
-    const deep = cands.filter((x) => tierCounts(bank.byCat[x.id])[4] >= 1);
+    // The final is read out and written down, so it uses text clues only.
+    const deep = cands.filter((x) => (bank.byCat[x.id] || []).some((q) => q.tier === 5 && q.type === 'text'));
     const [fc] = pickCategories(deep.length ? deep : cands, 1, { rand, catSeen: ctx.catSeen, gameNo: ctx.gameNo });
     if (fc) {
       taken.add(fc.id);
@@ -125,7 +126,7 @@ function selectGame(rules, ctx) {
     boards.push({ round, cats: cats.map(catInfo), cells });
   }
   if (final) {
-    const pool = bank.byCat[final.cat.id] || [];
+    const pool = (bank.byCat[final.cat.id] || []).filter((q) => q.type === 'text');
     const r = pickClue(pool, 5, c).q || pickClue(pool, 4, c).q || pickClue(pool, 3, c).q;
     if (r) final.q = r; else { final = null; report.short++; }
   }
@@ -139,11 +140,12 @@ function findReplacement(g, catId, tier, ctx) {
   const { used, facts } = gameUsed(g);
   (ctx.exclude || []).forEach((id) => used.add(id));
   const c = { used, facts, recent: ctx.recent || {}, gameNo: g.gameNo, rand: ctx.rand || Math.random, strict: false };
-  const same = pickClue(ctx.bank.byCat[catId] || [], tier, c).q;
+  const textOnly = ctx.textOnly ? (q) => q.type === 'text' : () => true;
+  const same = pickClue((ctx.bank.byCat[catId] || []).filter(textOnly), tier, c).q;
   if (same) return { q: same, how: 'same' };
   const inGame = new Set(gameCatIds(g));
   for (const cat of shuffleWith(usableCats(ctx.bank, g.rules).filter((x) => !inGame.has(x.id)), c.rand)) {
-    const q = pickClue(ctx.bank.byCat[cat.id] || [], tier, c).q;
+    const q = pickClue((ctx.bank.byCat[cat.id] || []).filter(textOnly), tier, c).q;
     if (q) return { q, how: 'other' };
   }
   return null;

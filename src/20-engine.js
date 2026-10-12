@@ -92,6 +92,28 @@ function rematch(g, ctx, now = Date.now()) {
 }
 
 /* ---------- a clue ---------- */
+/* Sound playback is part of the game state, so the host's buttons drive whichever screen
+   plays it (a TV window, or this device). Nothing plays until the host presses play.
+   seq goes up on every Replay. These aren't undo steps. */
+const freshPlay = () => ({ state: 'idle', seq: 0, vol: 0.9 });
+function mediaCmd(g, cmd, v) {
+  const key = g.phase === 'final' ? 'final' : 'current';
+  const cur = g[key]; if (!cur) return g;
+  const p = { ...freshPlay(), ...(cur.play || {}) };
+  if (cmd === 'play') p.state = 'playing';
+  else if (cmd === 'pause') p.state = 'paused';
+  else if (cmd === 'replay') { p.state = 'playing'; p.seq = (p.seq || 0) + 1; }
+  else if (cmd === 'stop') p.state = 'idle';
+  else if (cmd === 'vol') p.vol = clamp(+v || 0, 0, 1);
+  else return g;
+  return { ...g, [key]: { ...cur, play: p } };
+}
+// After a reload nothing should start playing by itself.
+function quietMedia(g) {
+  if (!g) return g;
+  const calm = (c) => (c && c.play && c.play.state === 'playing' ? { ...c, play: { ...c.play, state: 'paused' } } : c);
+  return { ...g, current: calm(g.current), final: calm(g.final) };
+}
 const curCell = (g) => (g.current ? cellById(g, g.current.cell) : null);
 const curValue = (g) => { const c = curCell(g); const cur = g.current; if (!c || !cur) return 0; return cur.wager ? (cur.bet || 0) : c.value; };
 // The most a team may wager on a Risk It square: its score, or the round's top value if that's higher.
@@ -103,7 +125,7 @@ function openCell(g, cellId, now = Date.now()) {
   const b = boardOf(g);
   if (g.phase !== 'board' || !c || !b || !b.cells.includes(c) || c.status !== 'open') return g;
   const n = withHistory(g, 'open');
-  const base = { cell: c.id, round: g.round, tried: [], changes: [], result: null, endsAt: null, pausedLeft: null, opener: g.picker };
+  const base = { cell: c.id, round: g.round, tried: [], changes: [], result: null, endsAt: null, pausedLeft: null, opener: g.picker, play: freshPlay() };
   const current = c.wager ? { ...base, wager: 1, stage: 'wager', team: g.picker, bet: null } : { ...base, wager: 0, stage: 'open', team: null };
   return { ...n, phase: 'clue', current };
 }
@@ -257,7 +279,7 @@ function showFinalClue(g, now = Date.now()) {
   const f = g.final;
   if (g.phase !== 'final' || f.stage !== 'wager' || !allWagersIn(g)) return g;
   const n = withHistory(g, 'finalClue');
-  return { ...n, final: { ...f, stage: 'clue', endsAt: now + ms(g.rules.finalTime * 1000), pausedLeft: null } };
+  return { ...n, final: { ...f, stage: 'clue', endsAt: now + ms(g.rules.finalTime * 1000), pausedLeft: null, play: freshPlay() } };
 }
 function startJudging(g) {
   const f = g.final;
@@ -342,7 +364,7 @@ function invalidateClue(g, where, opts) {
     const log = n.log.map((e) => (e.kind === 'final' && !e.void ? { ...e, void: true } : e));
     const replay = f.stage === 'clue' || f.stage === 'judge' || f.stage === 'done';
     n = { ...n, invalid: [...(n.invalid || []), invRecord(f.q, 'final', f.stage, o, refunds, rep, now)], log: [...log, { kind: 'invalid', where: 'final', refunds, replaced: true, at: now }],
-      final: { ...f, q: rep.q, judged: {}, order: [], stage: replay ? 'clue' : f.stage, endsAt: replay ? now + ms(g.rules.finalTime * 1000) : null, pausedLeft: null } };
+      final: { ...f, q: rep.q, judged: {}, order: [], stage: replay ? 'clue' : f.stage, endsAt: replay ? now + ms(g.rules.finalTime * 1000) : null, pausedLeft: null, play: freshPlay() } };
     return n;
   }
   const c = cellById(g, where);
@@ -366,8 +388,8 @@ function invalidateClue(g, where, opts) {
     const cur = g.current;
     // The new clue opens straight away: a Risk It keeps its wager; a normal clue starts again.
     if (rep) n = { ...n, phase: 'clue', current: cur.wager && cur.bet != null
-      ? { ...cur, stage: 'answer', team: cur.opener, tried: [], changes: [], result: null, endsAt: g.rules.answerClock ? now + ms(g.rules.answerTime * 1000) : null, pausedLeft: null }
-      : { ...cur, stage: cur.wager ? 'wager' : 'open', team: cur.wager ? cur.opener : null, tried: [], changes: [], result: null, endsAt: null, pausedLeft: null } };
+      ? { ...cur, stage: 'answer', team: cur.opener, tried: [], changes: [], result: null, endsAt: g.rules.answerClock ? now + ms(g.rules.answerTime * 1000) : null, pausedLeft: null, play: freshPlay() }
+      : { ...cur, stage: cur.wager ? 'wager' : 'open', team: cur.wager ? cur.opener : null, tried: [], changes: [], result: null, endsAt: null, pausedLeft: null, play: freshPlay() } };
     else n = { ...n, phase: 'board', current: null };
   }
   if (n.phase === 'board' && isBoardDone(n)) n = endOfBoard(n, now);
