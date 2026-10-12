@@ -1,0 +1,18 @@
+{
+  "name": "jeopardy-board",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jeopardy-Board — a clue-board quiz party game for one phone and a TV (English / Arabic).",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node tests/run.js",
+    "shots": "node tests/shots.js",
+    "audit": "node tools/audit.js",
+    "icons": "node tools/icons.js"
+  },
+  "devDependencies": {
+    "@babel/standalone": "7.24.7",
+    "fake-indexeddb": "6.0.0",
+    "jsdom": "24.1.0"
+  }
+}

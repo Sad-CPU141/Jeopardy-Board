@@ -1,9 +1,29 @@
 # Jeopardy-Board
 
-A clue-board quiz party game for one phone (the host) plus a TV. Bilingual (English / Arabic), static site, no backend.
+A clue-board quiz party game for one phone (the host) and a TV. English and Arabic. A static site with no backend: everything is saved on the host's device.
 
-**Status:** placeholder only. Nothing is playable yet — this commit exists so GitHub Pages can be switched on.
+Play: https://sad-cpu141.github.io/Jeopardy-Board/
 
-Live (once Pages is enabled): https://sad-cpu141.github.io/Jeopardy-Board/
+## How it plays
+- 2–4 teams. Each round is a board of 6 categories × 5 clues (200–1000 by default; round 2 doubles them).
+- The host reads a clue, teams buzz out loud, the host taps who was first and marks it right (+value, they pick next) or wrong (−value, the others can buzz).
+- **Risk It!** squares are hidden on the board: the team that finds one wagers before seeing the clue.
+- **Final Wager:** one category, secret wagers entered on the phone as it's passed round, one clue, and the host judges each team from the lowest score up.
+- Undo, fix scores, a game log, and "This is wrong" for a bad clue.
+- TV mode: use this screen as the TV, or open a second window in the same browser. The TV never shows a response or a wager before it's revealed.
 
-Jeopardy-Board is an independent fan-made game. It is not affiliated with, endorsed by, or using any assets from the Jeopardy! TV show.
+## Content
+600 clues in 30 categories (4 per value per category), written for this game. Clues with facts that can change are marked with the date they were true. Run `npm run audit` for the numbers.
+
+## Developing
+```
+npm install
+npm run build     # src/ → app.js, bank.js, styles.css, index.html, sw.js
+npm test          # rules, random games, jsdom click-through
+npm run shots     # Playwright screenshots (needs Playwright installed globally)
+npm run audit     # clue bank report
+```
+Edit `src/`, never the built files. See `CLAUDE.md` for the layout.
+
+## Not affiliated
+Jeopardy-Board is an independent fan-made game. It is not affiliated with or endorsed by the Jeopardy! TV show and uses none of its music, logo, set design, catchphrases or voice lines. Fonts: Anton, Barlow, Barlow Semi Condensed, Cairo (SIL Open Font License).
